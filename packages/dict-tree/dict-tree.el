@@ -3,7 +3,7 @@
 ;; Copyright (C) 2004-2012  Free Software Foundation, Inc
 
 ;; Author: Toby Cubitt <toby-predictive@dr-qubit.org>
-;; Version: 0.12.7
+;; Version: 0.12.8
 ;; Keywords: extensions, matching, data structures
 ;;           trie, tree, dictionary, completion, regexp
 ;; Package-Requires: ((trie "0.2.5") (tNFA "0.1.1") (heap "0.3"))
@@ -46,168 +46,6 @@
 ;;
 ;; This package uses the trie package trie.el. the tagged NFA package tNFA.el,
 ;; and the heap package heap.el.
-
-
-;;; Change Log:
-;;
-;; Version 0.12.7
-;; * create defstruct copier functions for dict-trees and meta-dict-trees
-;; * don't transform hash tables to alists when writing dictionaries if
-;;   running in an Emacs version that supports print-readable hash tables
-;; * simplified `dictree-write', `dictree--write-dict-code' and
-;;   `dictree--write-meta-dict-code'
-;;
-;; Version 0.12.6
-;; * replaced obsolete `interactive-p' with `called-interactively-p'
-;;
-;; Version 0.12.5
-;; * fixed default value handling in `read-dict'
-;;
-;; Version 0.12.4
-;; * minor bug-fix to `dictree--edebug-pretty-print' to print "nil" instead
-;;   of "()"
-;; * modified `dictree-save-modified' to catch errors when saving
-;;   dictionaries, and indicate failures via its return value
-;; * removed `dictree-save-modified' from `kill-emacs-hook' and added it
-;;   instead to `kill-emacs-query-functions', so that dictionary save failures
-;;   don't make it impossible to quit Emacs
-;; * fixed bug in `dictree--merge' that caused it to retain one too many list
-;;   elements for non-null MAXNUM
-;; * fixed `dictree--update-cache', which previously never updated cached
-;;   results for lists of prefixes in `dictree-complete' queries
-;; * fixed implementation of 'both cache policy
-;; * fixed bug in `read-dict' preventing completion on dictionary files
-;;   in `load-path'
-;; * fixed bugs in synchronisation of regexp query caches, renaming
-;;   `dictree--synchronise-query-cache' and
-;;   `dictree--synchronise-ranked-query-cache' to
-;;   `dictree--synchronise-completion-cache' and
-;;   `dictree--synchronise-ranked-completion-cache', and creating separate
-;;   `dictree--synchronise-regexp-cache' and
-;;   `dictree--synchronise-ranked-regep-cache' functions to handle regexp
-;;   query caches
-;;
-;; Version 0.12.3
-;; * bug-fix in `dictree--edebug-pretty-print'
-;;
-;; Version 0.12.2
-;; * bug-fix to DEFAULT argument handling in `read-dict'
-;;
-;; Version 0.12.1
-;; * added `edebug-prin1' and `edebug-prin1-to-string' advice to prevent
-;;   edebug hanging whilst printing large dictionaries
-;;
-;; Version 0.12
-;; * complete rewrite using new trie.el library
-;;
-;; Note: version 0.11.1 dictionaries not compatible with version 0.12 and
-;;       above
-;;
-;; Version 0.11.1
-;; * set and restore value of `byte-compile-disable-print-circle' instead of
-;;   let-binding it, to avoid warnings when compiling
-;; * added `dictree-goto-line' macro to work around `goto-line' bug
-;;
-;; Version 0.11
-;; * modified `dictree-write' so that, by default, both compiled and
-;;   uncompiled versions of dictionaries are created when writing dictionaries
-;;   to file
-;; * fixed slow byte-compilation under Emacs 22
-;;
-;; Version 0.10.2
-;; * very minor changes to text of some messages
-;;
-;; Version 0.10.1
-;; * added optional DICTLIST argument to `read-dict', to allow completion from
-;;   a restricted set of dictionaries
-;;
-;; Version 0.10
-;; * finally wrote a `dictree-delete' function!
-;;
-;; Version 0.9.1
-;; * fixed bug in `dictree-dump-words-to-buffer' (thanks to Dan Pomohaci for
-;;   reporting it)
-;; * replaced "word" with "key" in function arguments and docstrings, since
-;;   keys don't have to be words
-;; * removed "words" from dump functions' names, added TYPE argument in line
-;;   with other functions, and made them non-interactive
-;; * added COMPARE-FUNCTION argument to `dictree-create', which defaults to
-;;   subtraction as before
-;; * `dictree-read-line' reads the keys with `read', and no longer evals the
-;;   data as this fails for simple, useful cases (e.g. constant lists)
-;;
-;; Version 0.9
-;; * added meta-dictionary functionality
-;; * dictionary data can now be referenced by any sequence type, not just
-;;   strings * removed cl dependency
-;;
-;; Note: version 0.8 dictionaries not compatible with version 0.9 and above
-;;
-;; Version 0.8.4
-;; * fixed small bug in `read-dict'
-;;
-;; Version 0.8.3
-;; * fixed internal function and macro names
-;; * changed naming prefix from dict- to dictree- to avoid conflicts
-;; * `dict-write' now unloads old name and reloads new
-;;
-;; Version 0.8.2
-;; * added more commentary
-;;
-;; Version 0.8.1
-;; * fixed nasty bug in `dict-map' and `dict-mapcar' caused by dynamic scoping
-;;
-;; Version 0.8
-;; * changed `dict-map(car)' into functions and made them work with
-;;   lookup-only dicts
-;; * `dict-insert' now returns the new data value
-;; * rewrote cache data structures: data is now wrapped inside a cons cell, so
-;;   that cache entries can point to it instead of duplicating it. This fixes
-;;   some caching bugs and makes updating cached data when inserting words
-;;   much faster
-;; * dictionaries (but not lookup-only) can now associate two pieces of data
-;;   with each word: normal data, used to rank words returned by
-;;   `dict-complete-ordered', and meta-data, not used for ranking
-;; * modified functions to work with new caching and meta-data, and added
-;;   `dict-set-meta-data' and `dict-lookup-meta-data'
-;; * renamed to `dict-tree' to help avoid conflicts with other packages
-;;
-;; Version 0.7
-;; * added `dict-mapcar' macro
-;;
-;; Version 0.6.2
-;; * minor bug fixes
-;;
-;; Version 0.6.1
-;; * minor bug fixes
-;;
-;; Version 0.6
-;; * added dict-size function
-;; * added dict-dump-words-to-buffer function
-;; * dictionaries now set their names and filenames by doing a library search
-;;   for themselves when loaded using require
-;; * added `read-dict' minibuffer completion function
-;; * interactive commands that read a dictionary name now provide completion
-;;
-;; Version 0.5
-;; * added dict-dump-words-to-file function
-;;
-;; Version 0.4
-;; * fixed bug in dict-read-line
-;;
-;; Version 0.3
-;; * added dict-map function
-;;
-;; Version 0.2
-;; * added dictionary autosave flag and related functions;
-;; * fixed bug preventing dict caches being loaded properly;
-;; * explicitly require cl.el;
-;;
-;; Note: version 0.1 dictionaries not compatible with version 0.2 and above
-;;
-;; Version 0.1
-;; * initial release
-
 
 
 ;;; Code:
@@ -1579,6 +1417,8 @@ PREFIX is a prefix of STR."
 (defun dictree-clear-caches (dict)
   "Clear all DICT's query caches."
   (interactive (list (read-dict "Dictionary: ")))
+  (when (and (called-interactively-p 'any) (symbolp dict))
+    (setq dict (eval dict)))
   (dolist (cachefun '(dictree-lookup-cache
 		      dictree-complete-cache
 		      dictree-complete-ranked-cache
@@ -1688,7 +1528,7 @@ additional information, and can only be retrieved using
 `dictree-get-property'."
 
   ;; sort out arguments
-  (when (symbolp dict) (setq dict (eval dict)))
+  (and (symbolp dict) (setq dict (eval dict)))
   (cond
    ;; set PROPERTY for KEY in all constituent dicts of a meta-dict
    ((dictree--meta-dict-p dict)
@@ -1726,7 +1566,7 @@ still be detected by supplying the optional argument to
 Note that if DICT is a meta-dictionary, then this will delete
 KEY's PROPERTY in *all* its constituent dictionaries."
   ;; sort out arguments
-  (when (symbolp dict) (setq dict (eval dict)))
+  (and (symbolp dict) (setq dict (eval dict)))
   (cond
    ;; delete PROPERTY from KEY in all constituent dicts of a meta-dict
    ((dictree--meta-dict-p dict)
@@ -1914,6 +1754,8 @@ bind any variables with names commencing \"--\"."
   "Return the number of entries in dictionary DICT.
 Interactively, DICT is read from the mini-buffer."
   (interactive (list (read-dict "Dictionary: ")))
+  (when (and (called-interactively-p 'any) (symbolp dict))
+    (setq dict (eval dict)))
   (let ((count 0))
     (dictree-mapc (lambda (&rest dummy) (incf count)) dict)
     (when (called-interactively-p 'interactive)
@@ -2399,7 +2241,7 @@ that if the same key appears in multiple dictionaries, the alist
 may contain the same key multiple times, each copy associated
 with the data from a different dictionary. If you want to combine
 identical keys, use a meta-dictionary; see
-`dictree-meta-dict-create'.)
+`dictree-create-meta-dict'.)
 
 If optional argument RANK-FUNCTION is any non-nil value that is
 not a function, the completions are sorted according to the
@@ -2482,7 +2324,7 @@ are sought in all dictionaries in the list. (Note that if the
 same key appears in multiple dictionaries, the alist may contain
 the same key multiple times, each copy associated with the data
 from a different dictionary. If you want to combine identical
-keys, use a meta-dictionary; see `dictree-meta-dict-create'.)
+keys, use a meta-dictionary; see `dictree-create-meta-dict'.)
 
 REGEXP is a regular expression, but it need not necessarily be a
 string. It must be a sequence (vector, list of string) whose
@@ -2570,9 +2412,10 @@ both forms. See `dictree-write'.
 
 Interactively, DICT is read from the mini-buffer."
   (interactive (list (read-dict "Dictionary: ")))
+  (when (and (called-interactively-p 'any) (symbolp dict))
+    (setq dict (eval dict)))
 
   (let ((filename (dictree-filename dict)))
-
     ;; if dictionary has no associated file, prompt for one
     (unless (and filename (> (length filename) 0))
       (setq filename
@@ -2617,6 +2460,8 @@ and OVERWRITE is the prefix argument."
 		     (read-file-name "Write dictionary to file: "
 				     nil "")
 		     current-prefix-arg))
+  (when (and (called-interactively-p 'any) (symbolp dict))
+    (setq dict (eval dict)))
   ;; default to DICT's current file, if any
   (when (or (null filename)
 	    (and (called-interactively-p 'any) (string= filename "")))
@@ -2644,8 +2489,7 @@ and OVERWRITE is the prefix argument."
 	      (find-file-noselect
 	       (setq tmpfile (make-temp-file dictname))))
 	(set-buffer buff)
-	;; call the appropriate write function to write the dictionary
-	;; code
+	;; call the appropriate write function to write the dictionary code
 	(if (dictree--meta-dict-p dict)
 	    (dictree--write-meta-dict-code dict dictname filename)
 	  (dictree--write-dict-code dict dictname filename))
@@ -2671,11 +2515,9 @@ and OVERWRITE is the prefix argument."
 	      ;; destination
 	      (unless (eq compilation 'uncompiled)
 		(if (save-window-excursion
-		      (let ((restore byte-compile-disable-print-circle)
+		      (let ((byte-compile-disable-print-circle t)
 			    err)
-			(setq byte-compile-disable-print-circle t)
 			(setq err (byte-compile-file tmpfile))
-			(setq byte-compile-disable-print-circle restore)
 			err))
 		    (rename-file (concat tmpfile ".elc")
 				 (concat filename ".elc") t)
@@ -2782,7 +2624,7 @@ Interactively, FILE is read from the mini-buffer."
   (interactive (list (read-dict "Load dictionary: " nil nil t t)))
 
   ;; sort out dictionary name and file name
-  (if (dictree-p file)
+  (if (or (symbolp file) (dictree-p file))
       (message "Dictionary %s already loaded" (dictree-name file))
 
     ;; load the dictionary
@@ -2833,6 +2675,8 @@ Interactively, DICT is read from the mini-buffer, and DONT-SAVE
 is the prefix argument."
   (interactive (list (read-dict "Dictionary: ")
 		     current-prefix-arg))
+  (when (and (called-interactively-p 'any) (symbolp dict))
+    (setq dict (eval dict)))
 
   ;; if dictionary has been modified, autosave is set and not overidden,
   ;; save it first
@@ -3027,7 +2871,20 @@ is the prefix argument."
       (insert "(eval-when-compile (require 'cl))\n")
       (insert "(require 'dict-tree)\n")
       (insert "(defvar " dictname " nil \"Dictionary " dictname ".\")\n")
-      (insert "(setq " dictname " " (prin1-to-string tmpdict) ")\n")
+      (unwind-protect
+	  (progn
+	    ;; transform trie to print form
+	    (trie-transform-for-print (dictree--trie tmpdict))
+	    (insert "(setq " dictname
+		    " '" (prin1-to-string tmpdict) ")\n"))
+	;; if dictionary doesn't use any custom save functions, tmpdict's trie
+	;; is identical to original dict, so transform it back to usable form
+	;; on write error
+	(unless (or (dictree--data-savefun dict)
+		    (dictree--plist-savefun dict))
+	  (trie-transform-from-read (dictree--trie tmpdict))))
+      (insert "(trie-transform-from-read (dictree--trie "
+	      dictname "))\n")
       (when hashcode (insert hashcode))
       (insert "(unless (memq " dictname " dictree-loaded-list)\n"
 	      "  (push " dictname " dictree-loaded-list))\n"))))
@@ -3175,6 +3032,8 @@ are created when using a trie that is not self-balancing, see
   (interactive (list (read-dict "Dictionary: ")
 		     (read-file-name "File to populate from: "
 				     nil "" t)))
+  (when (and (called-interactively-p 'any) (symbolp dict))
+    (setq dict (eval dict)))
 
   (if (and (called-interactively-p 'any) (string= file ""))
       (message "No file specified; dictionary %s NOT populated"
@@ -3324,6 +3183,8 @@ TYPE is always 'string."
 		      "Buffer to dump to (defaults to current): "
 		      (buffer-name (current-buffer)))
 		     'string))
+  (when (and (called-interactively-p 'any) (symbolp dict))
+    (setq dict (eval dict)))
 
   ;; select the buffer, creating it if necessary
   (if buffer
@@ -3390,6 +3251,8 @@ Interactively, DICT and FILE are read from the mini-buffer,
 OVERWRITE is the prefix argument, and TYPE is always 'string."
   (interactive (list (read-dict "Dictionary: ")
 		     (read-file-name "File to dump to: " nil "")))
+  (when (and (called-interactively-p 'any) (symbolp dict))
+    (setq dict (eval dict)))
 
   (if (and (called-interactively-p 'any) (string= filename ""))
       (message "Dictionary %s NOT dumped" (dictree-name dict))
@@ -3483,7 +3346,7 @@ extension, suitable for passing to `load-library'."
      ((condition-case nil
 	  (dictree-p (eval (intern-soft dictname)))
 	(void-variable nil))
-      (eval (intern-soft dictname)))
+      (intern-soft dictname))
      ;; if user selected an unloaded dictionary, return dict name
      ((and allow-unloaded (stringp dictname)) dictname)
      ;; if DEFAULT was specified, return that
@@ -3539,17 +3402,17 @@ extension, suitable for passing to `load-library'."
 			     (concat "#<dict-tree \""
 				     (dictree-name d) "\">"))
 			   object " ") ")"))
-   ;; ((vectorp object)
-   ;;  (let ((pretty "[") (len (length object)))
-   ;;    (dotimes (i (1- len))
-   ;; 	(setq pretty
-   ;; 	      (concat pretty
-   ;; 		      (if (trie-p (aref object i))
-   ;; 			  "#<trie>" (prin1-to-string (aref object i))) " ")))
-   ;;    (concat pretty
-   ;; 	      (if (trie-p (aref object (1- len)))
-   ;; 		  "#<trie>" (prin1-to-string (aref object (1- len))))
-   ;; 	      "]")))
+;; ((vectorp object)
+;;  (let ((pretty "[") (len (length object)))
+;;    (dotimes (i (1- len))
+;; 	(setq pretty
+;; 	      (concat pretty
+;; 		      (if (trie-p (aref object i))
+;; 			  "#<trie>" (prin1-to-string (aref object i))) " ")))
+;;    (concat pretty
+;; 	      (if (trie-p (aref object (1- len)))
+;; 		  "#<trie>" (prin1-to-string (aref object (1- len))))
+;; 	      "]")))
    ))
 
 
