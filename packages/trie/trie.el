@@ -3,7 +3,7 @@
 ;; Copyright (C) 2008-2010, 2012  Free Software Foundation, Inc
 
 ;; Author: Toby Cubitt <toby-predictive@dr-qubit.org>
-;; Version: 0.2.5
+;; Version: 0.2.6
 ;; Keywords: extensions, matching, data structures
 ;;           trie, ternary search tree, tree, completion, regexp
 ;; Package-Requires: ((tNFA "0.1.1") (heap "0.3"))
@@ -136,57 +136,6 @@
 ;; tNFA.el, and the heap package heap.el.
 
 
-;;; Change Log:
-;;
-;; Version 0.2.5
-;; * removed `trie--avl-transform-for-print' and
-;;   `trie--avl-transform-from-read', since Emacs has supported printing and
-;;   reading circular data structures for a long time now, rendering these
-;;   transormers obsolete (note that `print-circle' *must* be enabled now when
-;;   printing an avl trie)
-;;
-;; Version 0.2.4
-;; * minor bug-fix to `trie--edebug-pretty-print' to print "nil" instead
-;;   of "()"
-;;
-;; Version 0.2.3
-;; * bug-fix in `trie--edebug-pretty-print'
-;;
-;; Version 0.2.2
-;; * added `edebug-prin1' and `edebug-prin1-to-string' advice to prevent
-;;   edebug hanging whilst printing large tries
-;;
-;; Version 0.2.1
-;; * bug-fix to result accumulation in `trie--do-regexp-search'
-;;
-;; Version 0.2
-;; * Replaced wildcard searches with regexp searches, using the tNFA.el tagged
-;;   non-deterministic finite state automata library. This is both more
-;;   general *and* more efficient.
-;; * bug fix in `trie--do-regexp-search'
-;;
-;; Version 0.1
-;; * Initial release (complete rewrite from scratch of tstree.el!)
-;; * Ternary search trees are now implemented as a tree of avl trees, which
-;;   has numerous advantages: self-balancing trees guarantee O(log n)
-;;   complexity regardless of how the tree is built; deletion is now done
-;;   properly.
-;; * Unlike tstree.el, trie.el is general enough to implement all sorts of
-;;   tries, not just ternary search trees (though these remain the default).
-;; * Up to "tstree"->"trie" renaming, many functions are drop-in replacements
-;;   for tstree.el functions. However, insertion and rank functions are no
-;;   longer stored in the data structure, so corresponidng arguments are no
-;;   longer optional. A single `trie-complete' function now deals with sorting
-;;   completions in both lexical or arbitrary order, the ranking function
-;;   being passed as an optional argument in the latter case. And functions
-;;   can no longer operate over multiple data structures at once; i.e. they no
-;;   longer accept lists of trees as arguments. (These features belong in
-;;   higher level libraries, and the efficiency loss is negligible.)
-;; * `trie-wildcard-search' implements efficient shell-glob-like wildcard
-;;   searches of tries!
-
-
-
 ;;; Code:
 
 (eval-when-compile (require 'cl))
@@ -213,6 +162,8 @@
 (put 'avl :trie-stack-createfun 'avl-tree-stack)
 (put 'avl :trie-stack-popfun 'avl-tree-stack-pop)
 (put 'avl :trie-stack-emptyfun 'avl-tree-stack-empty-p)
+(put 'avl :trie-transform-for-print 'trie--avl-transform-for-print)
+(put 'avl :trie-transform-from-read 'trie--avl-transform-from-read)
 
 
 
@@ -261,8 +212,8 @@
 		  (stack-createfun 'avl-tree-stack)
 		  (stack-popfun 'avl-tree-stack-pop)
 		  (stack-emptyfun 'avl-tree-stack-empty-p)
-		  (transform-for-print nil)
-		  (transform-from-read nil)
+		  (transform-for-print 'trie--avl-transform-for-print)
+		  (transform-from-read 'trie--avl-transform-from-read)
 		  &aux
 		  (cmpfun (trie--wrap-cmpfun comparison-function))
 		  (root (trie--node-create-root createfun cmpfun))
@@ -319,7 +270,9 @@
 ;; data is stored in the subtree cell of a terminal node
 (defalias 'trie--node-data 'trie--node-subtree)
 
-(defsetf trie--node-data (node) `(setf (trie--node-subtree ,node)))
+(defsetf trie--node-data trie--node-set-data)
+(defmacro trie--node-set-data (node data)
+  `(setf (trie--node-subtree ,node) ,data))
 
 (defmacro trie--node-data-p (node)
   ;; Return t if NODE is a data node, nil otherwise.
@@ -1906,17 +1859,17 @@ elements that matched the corresponding groups, in order."
 	(setq tlist (cdr tlist)))
       test)
     (concat "(" (mapconcat (lambda (dummy) "#<trie>") object " ") ")"))
-   ;; ((vectorp object)
-   ;;  (let ((pretty "[") (len (length object)))
-   ;;    (dotimes (i (1- len))
-   ;; 	(setq pretty
-   ;; 	      (concat pretty
-   ;; 		      (if (trie-p (aref object i))
-   ;; 			  "#<trie>" (prin1-to-string (aref object i))) " ")))
-   ;;    (concat pretty
-   ;; 	      (if (trie-p (aref object (1- len)))
-   ;; 		  "#<trie>" (prin1-to-string (aref object (1- len))))
-   ;; 	      "]")))
+;; ((vectorp object)
+;;  (let ((pretty "[") (len (length object)))
+;;    (dotimes (i (1- len))
+;; 	(setq pretty
+;; 	      (concat pretty
+;; 		      (if (trie-p (aref object i))
+;; 			  "#<trie>" (prin1-to-string (aref object i))) " ")))
+;;    (concat pretty
+;; 	      (if (trie-p (aref object (1- len)))
+;; 		  "#<trie>" (prin1-to-string (aref object (1- len))))
+;; 	      "]")))
    ))
 
 
