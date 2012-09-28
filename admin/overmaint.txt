@@ -7,3 +7,6 @@
 # Examples:
 #some-package/some-file.el    nomail
 #some-package/otherfile.el    none@example.com
+
+register-alist/register-list.el  bzg@gnu.org
+windresize/windresize.el.el      bzg@gnu.org
