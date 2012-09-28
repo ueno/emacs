@@ -4,10 +4,10 @@
 
 PATH="/bin:/usr/bin:/usr/local/bin:${PATH}"
 
-pkgname=`curl -s http://orgmode.org/pkg/daily/|perl -ne 'push @f, $1 if m/(org-\d{8}\.tar)/; END { @f = sort @f; print "$f[-1]\n"}'`
+pkgname=`curl -s http://orgmode.org/elpa/|perl -ne 'push @f, $1 if m/(org-\d{8}\.tar)/; END { @f = sort @f; print "$f[-1]\n"}'`
 
 cd $1
-wget -q http://orgmode.org/pkg/daily/${pkgname} -O ${pkgname}-tmp
+wget -q http://orgmode.org/elpa/${pkgname} -O ${pkgname}-tmp
 if [ -f ${pkgname}-tmp ]; then
     rm -f org*.tar
     mv ${pkgname}-tmp ${pkgname} && \
