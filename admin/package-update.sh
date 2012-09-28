@@ -82,8 +82,8 @@ if [ -z $FULL ]; then
     echo "Not fetching Org daily from orgmode.org"
 else
     echo "Fetching Org daily from orgmode.org"
-    pkgname=`curl -s http://orgmode.org/pkg/daily/|perl -ne 'push @f, $1 if m/(org-\d{8})\.tar/; END { @f = sort @f; print "$f[-1]\n"}'`
-    wget -q http://orgmode.org/pkg/daily/${pkgname}.tar -O ${pkgname}.tar
+    pkgname=`curl -s http://orgmode.org/elpa/|perl -ne 'push @f, $1 if m/(org-\d{8})\.tar/; END { @f = sort @f; print "$f[-1]\n"}'`
+    wget -q http://orgmode.org/elpa/${pkgname}.tar -O ${pkgname}.tar
     if [ -f ${pkgname}.tar ]; then
 	tar xf ${pkgname}.tar
 	rm -f ${pkgname}.tar
