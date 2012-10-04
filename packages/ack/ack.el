@@ -3,9 +3,10 @@
 ;; Copyright (C) 2012  Leo Liu
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
+;; Version: 0.8
 ;; Keywords: tools, processes, convenience
 ;; Created: 2012-03-24
-;; Version: 0.7
+;; URL: https://github.com/leoliu/ack-el
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -37,17 +38,6 @@
   :group 'tools
   :group 'processes)
 
-(defcustom ack-project-pattern-list
-  (list (concat "\\`" (regexp-quote dir-locals-file) "\\'")
-        "\\`Project\\.ede\\'"
-        "\\.xcodeproj\\'"         ; xcode
-        "\\`\\.ropeproject\\'"    ; python rope
-        ;; ".git" ".svn" ".hg" ".bzr" ".CVS"
-        "\\`\\.\\(?:CVS\\|bzr\\|git\\|hg\\|svn\\)\\'")
-  "A list of regexps that match files in a project root."
-  :type '(repeat string)
-  :group 'ack)
-
 ;; Used implicitly by `define-compilation-mode'
 (defcustom ack-scroll-output nil
   "Similar to `compilation-scroll-output' but for the *Ack* buffer."
@@ -65,6 +55,33 @@ Note also options to ack can be specified in ACK_OPTIONS
 environment variable and ~/.ackrc, which you can disable by the
 --noenv switch."
   :type 'string
+  :group 'ack)
+
+(defcustom ack-vc-grep-commands
+  '((".git" . "git --no-pager grep --color -n -i")
+    (".hg" . "hg grep -n -i")
+    ;; Plugin bzr-grep required for bzr < 2.6
+    (".bzr" . "bzr grep --color=always -n -i"))
+  "An alist of vc grep commands for `ack-skel-vc-grep'.
+Each element is of the form (VC_DIR . CMD)."
+  :type '(repeat (cons string string))
+  :group 'ack)
+
+(defcustom ack-default-directory-function 'ack-default-directory
+  "A function to return the default directory for `ack'.
+It is called with one arg, the prefix arg to `ack'."
+  :type 'function
+  :group 'ack)
+
+(defcustom ack-project-root-patterns
+  (list (concat "\\`" (regexp-quote dir-locals-file) "\\'")
+        "\\`Project\\.ede\\'"
+        "\\.xcodeproj\\'"               ; xcode
+        "\\`\\.ropeproject\\'"          ; python rope
+        "\\`\\.\\(?:CVS\\|bzr\\|git\\|hg\\|svn\\)\\'")
+  "A list of regexps to match files in a project root.
+Used by `ack-guess-project-root'."
+  :type '(repeat string)
   :group 'ack)
 
 ;;; ======== END of USER OPTIONS ========
@@ -207,6 +224,33 @@ This gets tacked on the end of the generated expressions.")
 
 (defvar ack--ansi-color-last-marker)
 
+(defvar ack-process-setup-function 'ack-process-setup)
+
+(defun ack-process-setup ()
+  ;; Handle `hg grep' output
+  (when (string-match-p "^[ \t]*hg[ \t]" (car compilation-arguments))
+    (setq compilation-error-regexp-alist
+          '(("^\\(.+?:[0-9]+:\\)\\(?:\\([0-9]+\\):\\)?" 1 2)))
+    (when (< emacs-major-version 24)
+      (setq font-lock-keywords (compilation-mode-font-lock-keywords)))
+    (make-local-variable 'compilation-parse-errors-filename-function)
+    (setq compilation-parse-errors-filename-function
+          (lambda (file)
+            (save-match-data
+              (if (string-match "\\(.+\\):\\([0-9]+\\):" file)
+                  (match-string 1 file)
+                file)))))
+  ;; Handle `bzr grep' output
+  (when (string-match-p "^[ \t]*bzr[ \t]" (car compilation-arguments))
+    (make-local-variable 'compilation-parse-errors-filename-function)
+    (setq compilation-parse-errors-filename-function
+          (lambda (file)
+            (save-match-data
+              ;; 'bzr grep -r' has files like `termcolor.py~147'
+              (if (string-match "\\(.+\\)~\\([0-9]+\\)" file)
+                  (match-string 1 file)
+                file))))))
+
 (define-compilation-mode ack-mode "Ack"
   "A compilation mode tailored for ack."
   (set (make-local-variable 'compilation-disable-input) t)
@@ -224,11 +268,29 @@ This gets tacked on the end of the generated expressions.")
               nil))))))
 
 (defun ack-skel-file ()
-  "Insert a template for case-insensitive filename search."
+  "Insert a template for case-insensitive file name search."
   (interactive)
   (delete-minibuffer-contents)
   (let ((ack (or (car (split-string ack-command nil t)) "ack")))
     (skeleton-insert '(nil ack " -g '(?i:" _ ")'"))))
+
+(defvar project-root)                   ; dynamically bound in `ack'
+
+(defun ack-skel-vc-grep ()
+  "Insert a template for vc grep search."
+  (interactive)
+  (let* ((regexp (concat "\\`" (regexp-opt
+                                (mapcar 'car ack-vc-grep-commands))
+                         "\\'"))
+         (root (or (ack-guess-project-root default-directory regexp)
+                   (error "Cannot locate vc project root")))
+         (which (car (directory-files root nil regexp)))
+         (cmd (or (cdr (assoc which ack-vc-grep-commands))
+                  (error "No command provided for `%s grep'"
+                         (substring which 1)))))
+    (setq project-root root)
+    (delete-minibuffer-contents)
+    (skeleton-insert '(nil cmd " '" _ "'"))))
 
 (defvar ack-minibuffer-local-map
   (let ((map (make-sparse-keymap)))
@@ -237,13 +299,14 @@ This gets tacked on the end of the generated expressions.")
                              'completion-at-point
                            'pcomplete))
     (define-key map "\M-I" 'ack-skel-file)
+    (define-key map "\M-G" 'ack-skel-vc-grep)
     (define-key map "'" 'skeleton-pair-insert-maybe)
     map)
   "Keymap used for reading `ack' command and args in minibuffer.")
 
 (defun ack-guess-project-root (start-directory &optional regexp)
   (let ((regexp (or regexp
-                    (mapconcat 'identity ack-project-pattern-list "\\|")))
+                    (mapconcat 'identity ack-project-root-patterns "\\|")))
         (parent (file-name-directory
                  (directory-file-name (expand-file-name start-directory)))))
     (if (directory-files start-directory nil regexp)
@@ -251,26 +314,41 @@ This gets tacked on the end of the generated expressions.")
       (unless (equal parent start-directory)
         (ack-guess-project-root parent regexp)))))
 
+(defun ack-default-directory (arg)
+  "A function for `ack-default-directory-function'.
+With no \\[universal-argument], return `default-directory';
+With one \\[universal-argument], find the project root according to
+`ack-project-root-patterns';
+Otherwise, interactively choose a directory."
+  (cond
+   ((not arg) default-directory)
+   ((= (prefix-numeric-value arg) 4)
+    (or (ack-guess-project-root default-directory)
+        (ack-default-directory '(16))))
+   (t (read-directory-name "In directory: " nil nil t))))
+
 ;;;###autoload
 (defun ack (command-args &optional directory)
   "Run ack using COMMAND-ARGS and collect output in a buffer.
-With prefix, ask for the DIRECTORY to run ack; otherwise the
-current project root is used.
+When called interactively, the value of DIRECTORY is provided by
+`ack-default-directory-function'.
 
 The following keys are available while reading from the
 minibuffer:
 
 \\{ack-minibuffer-local-map}"
   (interactive
-   (list (minibuffer-with-setup-hook (if (>= emacs-major-version 24)
-                                         'shell-completion-vars
-                                       'pcomplete-shell-setup)
-           (read-from-minibuffer "Run ack (like this): "
-                                 ack-command ack-minibuffer-local-map
-                                 nil 'ack-history))
-         (if current-prefix-arg
-             (read-directory-name "In directory: " nil nil t)
-           (ack-guess-project-root default-directory))))
+   (let ((project-root (funcall ack-default-directory-function
+                                current-prefix-arg))
+         ;; Disable completion cycling; see http://debbugs.gnu.org/12221
+         (completion-cycle-threshold nil))
+     (list (minibuffer-with-setup-hook (if (>= emacs-major-version 24)
+                                           'shell-completion-vars
+                                         'pcomplete-shell-setup)
+             (read-from-minibuffer "Run ack (like this): "
+                                   ack-command ack-minibuffer-local-map
+                                   nil 'ack-history))
+           project-root)))
   (let ((default-directory (expand-file-name
                             (or directory default-directory))))
     (compilation-start command-args 'ack-mode)))
