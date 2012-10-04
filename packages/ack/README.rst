@@ -1,7 +1,7 @@
 ==========================================
  Emacs Interface to command-line tool ack
 ==========================================
- 
+
 From http://betterthangrep.com/
 
     ack is a tool like grep, designed for programmers with large trees
@@ -9,6 +9,8 @@ From http://betterthangrep.com/
 
     ack is written purely in Perl, and takes advantage of the power of
     Perl's regular expressions.
+
+This package is part of `GNU ELPA <http://elpa.gnu.org>`_.
 
 Feature requests and bug reports are welcome. Thanks.
 
@@ -18,10 +20,18 @@ Features
 - Neither ``--nogroup`` nor ``--noheading`` is required
 - Handle colors using the standard library ``ansi-color.el``
 - Completion for ack options while reading from the minibuffer
+- Support ``git grep``, ``hg grep`` and ``bzr grep``
 - Support both emacs 23 and 24
 
 Screenshots
 -----------
+
+.. figure:: http://i.imgur.com/mrk8k.png
+   :width: 400 px
+   :target: http://i.imgur.com/mrk8k.png
+   :alt: ack-git-grep.png
+
+   ``git --no-pager grep -n --color 'hg grep'``
 
 .. figure:: http://i.imgur.com/a72Ap.png
    :width: 400 px
@@ -48,8 +58,8 @@ or::
 
  (autoload 'ack "ack" nil t)
 
-Completion
-~~~~~~~~~~
+Completion (optional)
+~~~~~~~~~~~~~~~~~~~~~
 
 Place ``pcmpl-ack.el`` in the ``load-path`` and add::
 
@@ -70,7 +80,13 @@ While reading ack command and args from the minibuffer, the following
 key bindings may be useful:
 
 - ``M-I`` => insert a template for case-insensitive file name search
+- ``M-G`` => insert a template for ``git grep``, ``hg grep`` or ``bzr grep``
 - ``TAB`` => completion for ack options
+
+Bugs
+----
+
+https://github.com/leoliu/ack-el/issues
 
 Contributors
 ------------
