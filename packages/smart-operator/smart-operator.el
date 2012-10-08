@@ -1,6 +1,6 @@
 ;;; smart-operator.el --- Insert operators with surrounding spaces smartly
 
-;; Copyright (C) 2004, 2005, 2007, 2008, 2009, 2010, 2011, 2012 William Xu
+;; Copyright (C) 2004, 2005, 2007-2012 Free Software Foundation, Inc.
 
 ;; Author: William Xu <william.xwl@gmail.com>
 ;; Version: 4.0
@@ -23,15 +23,12 @@
 
 ;;; Commentary:
 
-;; This extension tries to insert operators with surrounding spaces smartly.
-;; e.g., `=' becomes ` = ', `+=' becomes ` += '.  This is handy for writing
-;; C-style sources.
-
-;; To use, put this file to your load-path and the following to your
-;; ~/.emacs:
-;;             (require 'smart-operator)
+;; Smart Operator mode is a minor mode which automatically inserts
+;; surrounding spaces around operator symbols.  For example, `='
+;; becomes ` = ', `+=' becomes ` += '.  This is most handy for writing
+;; C-style source code.
 ;;
-;; Then `M-x smart-operator-mode' for toggling this minor mode.
+;; Type `M-x smart-operator-mode' to toggle this minor mode.
 
 ;;; Acknowledgements
 
