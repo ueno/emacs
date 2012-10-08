@@ -5,7 +5,7 @@
 ;; Author: Felix Lee <felix8a@gmail.com>, Michal Nazarewicz <mina86@mina86.com>
 ;; Maintainer: Michal Nazarewicz <mina86@mina86.com>
 ;; Keywoards: faces, minor-mode
-;; Version: 1.0
+;; Version: 1.1
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -88,31 +88,31 @@ ie. groups are counted starting with one outwards from the (place
 where) decimal point (would be) is."
   nil " num3" nil
   (if num3-mode
-      (unless (assoc '-num3-matcher font-lock-keywords)
-        (font-lock-add-keywords nil '(-num3-matcher) 'append))
-    (font-lock-remove-keywords nil '(-num3-matcher)))
+      (unless (assoc 'num3--matcher font-lock-keywords)
+        (font-lock-add-keywords nil '(num3--matcher) 'append))
+    (font-lock-remove-keywords nil '(num3--matcher)))
   (when font-lock-mode
     (font-lock-fontify-buffer)))
 
 ;;;###autoload
 (define-globalized-minor-mode global-num3-mode num3-mode num3-mode)
 
-(defconst -num3-number-re
+(defconst num3--number-re
   (concat    "\\(?:0[xX]\\|#\\)\\([0-9a-fA-F]+\\)"  ; 1 = hexadecimal
           "\\|\\([0-9]+\\)"                         ; 2 = decimal
           "\\|\\.\\([0-9]+\\)"))                    ; 3 = fraction
 
-(defun -num3-matcher (lim)
+(defun num3--matcher (lim)
   "Function used as a font-lock-keywoard handler used in `num3-mode'.
 Performs fontification of numbers from point to LIM."
   (save-excursion
-    (while (re-search-forward -num3-number-re lim t)
-      (-num3-int  (match-beginning 1) (match-end 1) 4)
-      (-num3-int  (match-beginning 2) (match-end 2) num3-group-size)
-      (-num3-frac (match-beginning 3) (match-end 3) num3-group-size)))
+    (while (re-search-forward num3--number-re lim t)
+      (num3--int  (match-beginning 1) (match-end 1) 4)
+      (num3--int  (match-beginning 2) (match-end 2) num3-group-size)
+      (num3--frac (match-beginning 3) (match-end 3) num3-group-size)))
   nil)
 
-(defun -num3-int (lo hi n)
+(defun num3--int (lo hi n)
   "Highlight groups of digits in a long number.
 LO and HI arguments specify the range where the number is
 located.  If the length of that region exceeds `num3-threshold',
@@ -122,10 +122,10 @@ faces.  Grouping is done from the end, eg. (12)(345)."
   (when (and lo (>= (- hi lo) num3-threshold))
     (let (even)
       (while (< lo hi)
-        (-num3-put even (max lo (- hi n)) hi)
+        (num3--put even (max lo (- hi n)) hi)
         (setq hi (- hi n) even (not even))))))
 
-(defun -num3-frac (lo hi n)
+(defun num3--frac (lo hi n)
   "Highlight groups of digits in a long number.
 LO and HI arguments specify the range where the number is
 located.  If the length of that region exceeds `num3-threshold',
@@ -135,10 +135,10 @@ faces.  Grouping is done from the beginning, eg. (123)(45)."
   (when (and lo (>= (- hi lo) num3-threshold))
     (let (even)
       (while (< lo hi)
-        (-num3-put even lo (min hi (+ lo n)))
+        (num3--put even lo (min hi (+ lo n)))
         (setq lo (+ lo n) even (not even))))))
 
-(defun -num3-put (even lo hi)
+(defun num3--put (even lo hi)
   "Add font lock text property to highlight a single group of digit.
 Use `num3-face-odd' if EVEN is nil and `num3-face-even' if EVEN is
 non-nil.  The region the face is set to is from LO to HI."
