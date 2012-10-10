@@ -5,7 +5,7 @@
 ;; Author: Francis J. Wright <F.J.Wright at qmul.ac.uk>
 ;; Time-stamp: <23 August 2004>
 ;; URL: http://centaur.maths.qmul.ac.uk/Emacs/
-;; Version: 1.0
+;; Version: 1.1
 ;; Keywords: convenience
 
 ;; This package is free software; you can redistribute it and/or modify
