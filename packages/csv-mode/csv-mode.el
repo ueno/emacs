@@ -1,4 +1,4 @@
-;;; csv-mode.el --- Major mode for editing comma/char separated values
+;;; csv-mode.el --- Major mode for editing comma/char separated values  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2003, 2004, 2012  Free Software Foundation, Inc
 
@@ -134,14 +134,13 @@ Set by customizing `csv-separators' -- do not set directly!")
   "Font lock keywords to highlight the field separators in CSV mode.
 Set by customizing `csv-separators' -- do not set directly!")
 
-(defcustom csv-separators '(",")
+(defcustom csv-separators '("," "\t")
   "Field separators: a list of *single-character* strings.
 For example: (\",\"), the default, or (\",\" \";\" \":\").
 Neighbouring fields may be separated by any one of these characters.
 The first is used when inserting a field separator into the buffer.
 All must be different from the field quote characters, `csv-field-quotes'."
   ;; Suggested by Eckhard Neber <neber@mwt.e-technik.uni-ulm.de>
-  :group 'CSV
   :type '(repeat string)
   ;; FIXME: Character would be better, but in Emacs 21.3 does not display
   ;; correctly in a customization buffer.
@@ -159,14 +158,13 @@ All must be different from the field quote characters, `csv-field-quotes'."
 	       csv-separator-regexp (apply 'concat `("[" ,@value "]"))
 	       csv-font-lock-keywords
 	       ;; NB: csv-separator-face variable evaluates to itself.
-	       `((,csv-separator-regexp . csv-separator-face)))))
+	       `((,csv-separator-regexp (0 'csv-separator-face))))))
 
 (defcustom csv-field-quotes '("\"")
   "Field quotes: a list of *single-character* strings.
 For example: (\"\\\"\"), the default, or (\"\\\"\" \"'\" \"`\").
 A field can be delimited by a pair of any of these characters.
 All must be different from the field separators, `csv-separators'."
-  :group 'CSV
   :type '(repeat string)
   ;; Character would be better, but in Emacs 21 does not display
   ;; correctly in a customization buffer.
@@ -216,7 +214,6 @@ This variable is buffer local\; its default value is that of
 Such comment lines are ignored by CSV mode commands.
 Default value of buffer-local variable `csv-comment-start'.
 Changing this variable does not affect any existing CSV mode buffer."
-  :group 'CSV
   :type '(choice (const :tag "None" nil) string)
   :set (lambda (variable value)
 	 (custom-set-default variable value)
@@ -226,35 +223,25 @@ Changing this variable does not affect any existing CSV mode buffer."
   "Aligned field style: one of 'left, 'centre, 'right or 'auto.
 Alignment style used by `csv-align-fields'.
 Auto-alignment means left align text and right align numbers."
-  :group 'CSV
   :type '(choice (const left) (const centre)
 		 (const right) (const auto)))
 
 (defcustom csv-align-padding 1
   "Aligned field spacing: must be a positive integer.
 Number of spaces used by `csv-align-fields' after separators."
-  :group 'CSV
   :type 'integer)
 
 (defcustom csv-header-lines 0
   "Header lines to skip when setting region automatically."
-  :group 'CSV
   :type 'integer)
 
-(defcustom csv-invisibility-default nil
+(defcustom csv-invisibility-default t
   "If non-nil, make separators in aligned records invisible."
-  :group 'CSV
   :type 'boolean)
 
 (defface csv-separator-face
-  '((((class color)) (:foreground "red"))
-    (t (:weight bold)))
-  "CSV mode face used to highlight separators."
-  :group 'CSV)
-
-;; This mechanism seems to keep XEmacs happy:
-(defvar csv-separator-face 'csv-separator-face
-  "Face name to use to highlight separators.")
+  '((t :inherit escape-glyph))
+  "CSV mode face used to highlight separators.")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;  Mode definition, key bindings and menu
@@ -267,11 +254,16 @@ Number of spaces used by `csv-align-fields' after separators."
 
 (defconst csv-mode-line-format
   ;; See bindings.el for details of `mode-line-format' construction.
-  (append (butlast (default-value 'mode-line-format) 2)
-	  (cons `(csv-field-index-string
-		  ("" csv-field-index-string
-		   ,(propertize "--" 'help-echo csv-mode-line-help-echo)))
-		(last (default-value 'mode-line-format) 2)))
+  (let* ((ml (copy-sequence (default-value 'mode-line-format)))
+         (x (or (memq 'mode-line-position ml) (last 3 ml))))
+    (when x
+      (setcdr x (cons
+                 `(csv-field-index-string
+                   ("" csv-field-index-string
+                    ;; ,(propertize "--" 'help-echo csv-mode-line-help-echo)
+                    ))
+                 (cdr x))))
+    ml)
   "Mode line format string for CSV mode.")
 
 (defvar csv-mode-map
@@ -338,6 +330,7 @@ CSV mode provides the following specific keyboard key bindings:
    buffer-invisibility-spec csv-invisibility-default
    ;; Mode line to support `csv-field-index-mode':
    mode-line-format csv-mode-line-format)
+  (set (make-local-variable 'truncate-lines) t)
   ;; Enable or disable `csv-field-index-mode' (could probably do this
   ;; a bit more efficiently):
   (csv-field-index-mode (symbol-value 'csv-field-index-mode)))
@@ -482,19 +475,18 @@ The default field when read interactively is the current field."
   ;; Must be run interactively to activate mark!
   (let* ((arg current-prefix-arg) (default-field 1)
 	 (region
-	  (if (and transient-mark-mode (not mark-active))
+	  (if (not (use-region-p))
 	      ;; Set region automatically:
 	      (save-excursion
-		(let (startline lbp)
-		  (if arg
-		      (beginning-of-line)
-		    (setq lbp (line-beginning-position))
-		    (while (re-search-backward csv-separator-regexp lbp 1)
-		      ;; Move as far as possible, i.e. to beginning of line.
-		      (setq default-field (1+ default-field))))
-		  (if (csv-not-looking-at-record)
-		      (error "Point may not be within CSV records"))
-		  (setq startline (point))
+                (if arg
+                    (beginning-of-line)
+                  (let ((lbp (line-beginning-position)))
+                    (while (re-search-backward csv-separator-regexp lbp 1)
+                      ;; Move as far as possible, i.e. to beginning of line.
+                      (setq default-field (1+ default-field)))))
+                (if (csv-not-looking-at-record)
+                    (error "Point must be within CSV records"))
+		(let ((startline (point)))
 		  ;; Set mark at beginning of region:
 		  (while (not (or (bobp) (csv-not-looking-at-record)))
 		    (forward-line -1))
@@ -748,7 +740,6 @@ which case extend the record as necessary."
 
 (defcustom csv-field-index-delay 0.125
   "Time in seconds to delay before updating field index display."
-  :group 'CSV
   :type '(number :tag "seconds"))
 
 (defvar csv-field-index-idle-timer nil)
@@ -765,7 +756,6 @@ With prefix ARG, turn CSV-Field-Index mode on if and only if ARG is positive.
 Returns the new status of CSV-Field-Index mode (non-nil means on).
 When CSV-Field-Index mode is enabled, the current field index appears in
 the mode line after `csv-field-index-delay' seconds of Emacs idle time."
-  :group 'CSV
   :global t
   :init-value t		       ; for documentation, since default is t
   ;; This macro generates a function that first sets the mode
@@ -981,6 +971,27 @@ The fields yanked are those last killed by `csv-kill-fields'."
 ;;;  Aligning fields
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun csv--column-widths ()
+  (let ((widths '()))
+    ;; Construct list of column widths:
+    (while (not (eobp))                   ; for each record...
+      (or (csv-not-looking-at-record)
+          (let ((w widths)
+                (beg (point))            ; Beginning of current field.
+                x)
+            (while (not (eolp))
+              (csv-end-of-field)
+              (setq x (- (point) beg))    ; Field width.
+              (if w
+                  (if (> x (car w)) (setcar w x))
+                (setq w (list x)
+                      widths (nconc widths w)))
+              (or (eolp) (forward-char))  ; Skip separator.
+              (setq w (cdr w)
+                    beg (point)))))
+      (forward-line))
+    widths))
+
 (defun csv-align-fields (hard beg end)
   "Align all the fields in the region to form columns.
 The alignment style is specified by `csv-align-style'.  The number of
@@ -997,147 +1008,124 @@ non-nil when the records are aligned\; this can be changed only by
 re-aligning.  \(Unaligning always makes separators visible.)
 
 When called non-interactively, use hard alignment if HARD is non-nil\;
-BEG and END specify the region to align."
-  (interactive (csv-interactive-args))
-  (setq end (set-marker (make-marker) end))
-  (csv-unalign-fields hard beg end) ; if hard then barfs if buffer read only
+BEG and END specify the region to align.
+If there is no selected region, default to the whole buffer."
+  (interactive (cons current-prefix-arg
+                     (if (use-region-p)
+                         (list (region-beginning) (region-end))
+                       (list (point-min) (point-max)))))
+  (setq end (copy-marker end))
+  (csv-unalign-fields hard beg end) ; If hard then barfs if buffer read only.
   (save-excursion
     (save-restriction
       (narrow-to-region beg end)
       (set-marker end nil)
       (goto-char (point-min))
-      (let (widths)
-	;; Construct list of column widths:
-	(while (not (eobp))		; for each record...
-	  (or (csv-not-looking-at-record)
-	      (let ((w widths) x)
-		(setq beg (point))	; Beginning of current field.
-		(while (not (eolp))
-		  (csv-end-of-field)
-		  (setq x (- (point) beg)) ; Field width.
-		  (if w
-		      (if (> x (car w)) (setcar w x))
-		    (setq w (list x)
-			  widths (nconc widths w)))
-		  (or (eolp) (forward-char)) ; Skip separator.
-		  (setq w (cdr w)
-			beg (point)))))
-	  (forward-line))
+      (let ((widths (csv--column-widths)))
 
 	;; Align fields:
 	(goto-char (point-min))
 	(while (not (eobp))		; for each record...
-	  (or (csv-not-looking-at-record)
-	      (let ((w widths) (padding 0) x)
-		(setq beg (point))	; beginning of current field
-		(while (and w (not (eolp)))
-		  (let ((left-padding 0) (right-padding 0) overlay)
-		    (csv-end-of-field)
-		    (set-marker end (point)) ; end of current field
-                    ;; FIXME: Don't assume length=string-width!
-		    (setq x (- (point) beg) ; field width
-			  x (- (car w) x)) ; required padding
+	  (unless (csv-not-looking-at-record)
+            (let ((w widths)
+                  (column 0))    ;Desired position of left-side of this column.
+              (while (and w (not (eolp)))
+                (let* ((beg (point))
+                       (align-padding (if (bolp) 0 csv-align-padding))
+                       (left-padding 0) (right-padding 0)
+                       (field-width
+                        ;; FIXME: Don't assume length=string-width!
+                        (progn (csv-end-of-field) (- (point) beg)))
+                       (column-width (pop w))
+                       (x (- column-width field-width))) ; Required padding.
+                  (set-marker end (point)) ; End of current field.
+                  ;; beg = beginning of current field
+                  ;; end = (point) = end of current field
 
-		    ;; beg = beginning of current field
-		    ;; end = (point) = end of current field
+                  ;; Compute required padding:
+                  (cond
+                   ((eq csv-align-style 'left)
+                    ;; Left align -- pad on the right:
+                    (setq left-padding align-padding
+                          right-padding x))
+                   ((eq csv-align-style 'right)
+                    ;; Right align -- pad on the left:
+                    (setq left-padding (+ align-padding x)))
+                   ((eq csv-align-style 'auto)
+                    ;; Auto align -- left align text, right align numbers:
+                    (if (string-match "\\`[-+.[:digit:]]+\\'"
+                                      (buffer-substring beg (point)))
+                        ;; Right align -- pad on the left:
+                        (setq left-padding (+ align-padding x))
+                      ;; Left align -- pad on the right:
+                      (setq left-padding align-padding
+                            right-padding x)))
+                   ((eq csv-align-style 'centre)
+                    ;; Centre -- pad on both left and right:
+                    (let ((y (/ x 2)))  ; truncated integer quotient
+                      (setq left-padding (+ align-padding y)
+                            right-padding (- x y)))))
 
-		    ;; Compute required padding:
-		    (cond
-		     ((eq csv-align-style 'left)
-		      ;; Left align -- pad on the right:
-		      (setq left-padding csv-align-padding
-			    right-padding x))
-		     ((eq csv-align-style 'right)
-		      ;; Right align -- pad on the left:
-		      (setq left-padding (+ csv-align-padding x)))
-		     ((eq csv-align-style 'auto)
-		      ;; Auto align -- left align text, right align numbers:
-		      (if (string-match "\\`[-+.[:digit:]]+\\'"
-					(buffer-substring beg (point)))
-			  ;; Right align -- pad on the left:
-			  (setq left-padding (+ csv-align-padding x))
-			;; Left align -- pad on the right:
-			(setq left-padding csv-align-padding
-			      right-padding x)))
-		     ((eq csv-align-style 'centre)
-		      ;; Centre -- pad on both left and right:
-		      (let ((y (/ x 2))) ; truncated integer quotient
-			(setq left-padding (+ csv-align-padding y)
-			      right-padding (- x y)))))
-
-		    (cond
-                     (hard
-                      ;; Hard alignment...
-                      (when (> left-padding 0) ; Pad on the left.
-                        ;; Insert spaces before field:
-                        (if (= beg end) ; null field
-                            (insert (make-string left-padding ?\ ))
-                          (goto-char beg) ; beginning of current field
+                  (cond
+                   (hard ;; Hard alignment...
+                    (when (> left-padding 0) ; Pad on the left.
+                      ;; Insert spaces before field:
+                      (if (= beg end)   ; null field
                           (insert (make-string left-padding ?\ ))
-                          (goto-char end))) ; end of current field
-                      (unless (eolp)
-                        (if (> right-padding 0) ; pad on the right
-                            ;; Insert spaces after field:
-                            (insert (make-string right-padding ?\ )))
-                        ;; Make separator (potentially) invisible;
-                        ;; in Emacs 21.3, neighbouring overlays
-                        ;; conflict, so use the following only
-                        ;; with hard alignment:
-                        (let ((ol (make-overlay (point) (1+ (point)) nil t)))
-                          (overlay-put ol 'invisible t)
-                          (overlay-put ol 'evaporate t))
-                        (forward-char))) ; skip separator
-
-                     ;; Soft alignment...
-                     ;; FIXME: Use (space :align-to ...) display property.
-
-                     (buffer-invisibility-spec ; csv-hide-separators
-
-                      ;; Hide separators...
-                      ;; Merge right-padding from previous field
-                      ;; with left-padding from this field:
-                      (setq padding (+ padding left-padding))
-                      (when (> padding 0)
                         (goto-char beg) ; beginning of current field
-                        (if (bolp)
-                            ;; Display spaces before first field
-                            ;; by overlaying first character:
-                            (overlay-put
-                             (make-overlay (point) (1+ (point)))
-                             'before-string
-                             (make-string padding ?\ ))
-                          ;; Display separator as spaces:
-                          (overlay-put
-                           (make-overlay (1- (point)) (point) nil nil t)
-                           ;; 'face 'secondary-selection)) ; test
-                           ;; 'display (make-string padding ?\ )))
-                           ;; Above 'display mangles buffer
-                           ;; horribly if any string is empty!
-                           'display `(space :width ,padding)))
-                        (goto-char end)) ; end of current field
-                      (unless (eolp)
-                        (setq padding right-padding)
-                        (forward-char))) ; skip separator
+                        (insert (make-string left-padding ?\ ))
+                        (goto-char end))) ; end of current field
+                    (unless (eolp)
+                      (if (> right-padding 0) ; pad on the right
+                          ;; Insert spaces after field:
+                          (insert (make-string right-padding ?\ )))
+                      ;; Make separator (potentially) invisible;
+                      ;; in Emacs 21.3, neighbouring overlays
+                      ;; conflict, so use the following only
+                      ;; with hard alignment:
+                      (let ((ol (make-overlay (point) (1+ (point)) nil t)))
+                        (overlay-put ol 'invisible t)
+                        (overlay-put ol 'evaporate t))
+                      (forward-char)))  ; skip separator
 
-                     (t ;; Do not hide separators...
+                   ;; Soft alignment...
+                   (buffer-invisibility-spec ; csv-invisibility-default
+
+                    ;; Hide separators...
+                    ;; Merge right-padding from previous field
+                    ;; with left-padding from this field:
+                    (if (zerop column)
+                        (when (> left-padding 0)
+                          ;; Display spaces before first field
+                          ;; by overlaying first character:
+                          (overlay-put
+                           (make-overlay beg (1+ beg))
+                           'before-string
+                           (make-string left-padding ?\ )))
+                      ;; Display separator as spaces:
+                      (with-silent-modifications
+                        (put-text-property
+                         (1- beg) beg
+                         'display `(space :align-to
+                                          ,(+ left-padding column)))))
+                    (unless (eolp) (forward-char)) ; Skip separator.
+                    (setq column (+ column column-width align-padding)))
+
+                   (t ;; Do not hide separators...
+                    (let ((overlay (make-overlay beg (point) nil nil t)))
                       (when (> left-padding 0) ; Pad on the left.
                         ;; Display spaces before field:
-                        (setq overlay (make-overlay beg (point) nil nil t))
                         (overlay-put overlay 'before-string
                                      (make-string left-padding ?\ )))
                       (unless (eolp)
                         (if (> right-padding 0) ; Pad on the right.
                             ;; Display spaces after field:
                             (overlay-put
-                             (or overlay
-                                 (make-overlay beg (point) nil nil t))
+                             overlay
                              'after-string (make-string right-padding ?\ )))
-                        (forward-char))) ; Skip separator.
+                        (forward-char)))) ; Skip separator.
 
-		      ))
-
-		  (setq w (cdr w)
-			beg (point)))))
+                   )))))
 	  (forward-line)))))
   (set-marker end nil))
 
@@ -1147,10 +1135,16 @@ Undo soft alignment introduced by `csv-align-fields'.  If invoked with
 an argument then also remove all spaces and tabs around separators.
 Also make all invisible separators visible again.
 Ignore blank and comment lines.  When called non-interactively, remove
-spaces and tabs if HARD non-nil\; BEG and END specify region to unalign."
-  (interactive (csv-interactive-args))
+spaces and tabs if HARD non-nil\; BEG and END specify region to unalign.
+If there is no selected region, default to the whole buffer."
+  (interactive (cons current-prefix-arg
+                     (if (use-region-p)
+                         (list (region-beginning) (region-end))
+                       (list (point-min) (point-max)))))
   ;; Remove any soft alignment:
   (mapc 'delete-overlay	(overlays-in beg end))
+  (with-silent-modifications
+    (remove-list-of-text-properties beg end '(display)))
   (when hard
     (barf-if-buffer-read-only)
     ;; Remove any white-space padding around separators:
