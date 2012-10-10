@@ -1,6 +1,6 @@
 ;;; debbugs-gnu.el --- interface for the GNU bug tracker
 
-;; Copyright (C) 2011 Free Software Foundation, Inc.
+;; Copyright (C) 2011, 2012 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: comm, hypermedia, maint
@@ -30,7 +30,7 @@
 ;; also for other GNU projects which use the same bug tracker.
 
 ;; If you have `debbugs-gnu.el' in your load-path, you could enable
-;; the bug tracker command by the following lines in your ~/.emacs
+;; the bug tracker commands by the following lines in your ~/.emacs
 ;;
 ;;   (autoload 'debbugs-gnu "debbugs-gnu" "" 'interactive)
 ;;   (autoload 'debbugs-gnu-search "debbugs-gnu" "" 'interactive)
@@ -76,7 +76,7 @@
 ;; `debbugs-gnu-default-severities', `debbugs-gnu-default-packages',
 ;; `debbugs-gnu-default-hits-per-page' and `debbugs-gnu-default-suppress-bugs'.
 
-;; The command creates one or more pages of bug lists.  Every bug is
+;; The commands create one or more pages of bug lists.  Every bug is
 ;; shown in one line, including the bug number, the status (combining
 ;; merged bug numbers, keywords and severities), the name of the
 ;; submitter, and the title of the bug.  On every bug line you could
@@ -93,6 +93,8 @@
 ;;   "q": Quit the buffer
 ;;   "s": Toggle bug sorting for age or for state
 ;;   "x": Toggle suppressing of bugs
+;;   "/": Display only bugs matching a string
+;;   "w": Display all the currently selected bug reports
 
 ;; When you visit the related bug messages in Gnus, you could also
 ;; send control messages by keystroke "C".
@@ -123,6 +125,7 @@
 (defcustom debbugs-gnu-default-severities '("serious" "important" "normal")
   "*The list severities bugs are searched for.
 \"tagged\" is not a severity but marks locally tagged bugs."
+  ;; <http://debbugs.gnu.org/Developer.html#severities>
   :group 'debbugs-gnu
   :type '(set (const "serious")
 	      (const "important")
@@ -134,12 +137,14 @@
 
 (defcustom debbugs-gnu-default-packages '("emacs")
   "*The list of packages to be searched for."
+  ;; <http://debbugs.gnu.org/Packages.html>
   :group 'debbugs-gnu
   :type '(set (const "automake")
 	      (const "coreutils")
 	      (const "debbugs.gnu.org")
 	      (const "emacs")
 	      (const "emacs-xwidgets")
+	      (const "fm")
 	      (const "gnus")
 	      (const "guile")
 	      (const "libtool")
@@ -516,6 +521,7 @@ marked as \"client-side filter\"."
      (t (sort (append (apply 'debbugs-get-bugs args) tagged) '<)))))
 
 (defvar debbugs-gnu-current-widget nil)
+(defvar debbugs-gnu-current-limit nil)
 
 (defvar widget-mouse-face)
 
@@ -752,7 +758,6 @@ Used instead of `tabulated-list-print-entry'."
     (goto-char pos)))
 
 (defvar debbugs-gnu-sort-state 'number)
-(defvar debbugs-gnu-current-limit nil)
 
 (define-derived-mode debbugs-gnu-mode tabulated-list-mode "Debbugs"
   "Major mode for listing bug reports.
@@ -1054,7 +1059,7 @@ removed instead."
 	       ((equal message "owner")
 		(format "owner %d !\n" id))
 	       ((equal message "reassign")
-		(format "reassign %d %s\n" id (read-string "Package: ")))
+		(format "reassign %d %s\n" id (read-string "Package(s): ")))
 	       ((equal message "close")
 		(format "close %d %s\n" id version))
 	       ((equal message "done")
