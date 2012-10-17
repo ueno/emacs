@@ -140,8 +140,8 @@
   :version "24.1")
 
 (defconst debbugs-gnu-all-severities
-  "*List of all possible severities."
-  (mapcar 'cadr (cdr (get 'debbugs-gnu-default-severities 'custom-type))))
+  (mapcar 'cadr (cdr (get 'debbugs-gnu-default-severities 'custom-type)))
+  "*List of all possible severities.")
 
 (defcustom debbugs-gnu-default-packages '("emacs")
   "*The list of packages to be searched for."
@@ -160,8 +160,8 @@
   :version "24.1")
 
 (defconst debbugs-gnu-all-packages
-  "*List of all possible package names."
-  (mapcar 'cadr (cdr (get 'debbugs-gnu-default-packages 'custom-type))))
+  (mapcar 'cadr (cdr (get 'debbugs-gnu-default-packages 'custom-type)))
+  "*List of all possible package names.")
 
 (defcustom debbugs-gnu-default-hits-per-page 500
   "*The number of bugs shown per page."
