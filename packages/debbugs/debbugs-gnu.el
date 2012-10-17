@@ -46,8 +46,12 @@
 ;; used, although configured on the GNU bug tracker.  If no severity
 ;; is given, all bugs are selected.
 
-;; There is also the pseudo severity "tagged", which selects locally
-;; tagged bugs.
+;; There is also the pseudo severity "tagged".  When it is used, the
+;; function will ask for user tags (a comma separated list), and shows
+;; just the bugs which are tagged with them.  In general, user tags
+;; shall be strings denoting to subprojects of the package, like
+;; "cedet" or "tramp" of the package "emacs.  If no user tag is given,
+;; locally tagged bugs are shown.
 
 ;; If a prefix is given to the command, more search parameters are
 ;; asked for, like packages (also a comma separated list, "emacs" is
@@ -135,6 +139,10 @@
 	      (const "tagged"))
   :version "24.1")
 
+(defconst debbugs-gnu-all-severities
+  "*List of all possible severities."
+  (mapcar 'cadr (cdr (get 'debbugs-gnu-default-severities 'custom-type))))
+
 (defcustom debbugs-gnu-default-packages '("emacs")
   "*The list of packages to be searched for."
   ;; <http://debbugs.gnu.org/Packages.html>
@@ -150,6 +158,10 @@
 	      (const "libtool")
 	      (const "woodchuck"))
   :version "24.1")
+
+(defconst debbugs-gnu-all-packages
+  "*List of all possible package names."
+  (mapcar 'cadr (cdr (get 'debbugs-gnu-default-packages 'custom-type))))
 
 (defcustom debbugs-gnu-default-hits-per-page 500
   "*The number of bugs shown per page."
@@ -281,20 +293,15 @@ marked as \"client-side filter\"."
 	      (setq
 	       severities
 	       (completing-read-multiple
-		"Enter severities: "
-		(mapcar
-		 'cadr (cdr (get 'debbugs-gnu-default-severities 'custom-type)))
-		nil t
+		"Enter severities: " debbugs-gnu-all-severities nil t
 		(mapconcat 'identity debbugs-gnu-default-severities ","))))
 
 	     ((equal key "package")
 	      (setq
 	       packages
 	       (completing-read-multiple
-		"Enter packages: "
-		(mapcar
-		 'cadr (cdr (get 'debbugs-gnu-default-packages 'custom-type)))
-		nil t (mapconcat 'identity debbugs-gnu-default-packages ","))))
+		"Enter packages: " debbugs-gnu-all-packages nil t
+		(mapconcat 'identity debbugs-gnu-default-packages ","))))
 
 	     ((equal key "archive")
 	      ;; We simplify, by assuming just archived bugs are requested.
@@ -382,26 +389,28 @@ marked as \"client-side filter\"."
 	  debbugs-gnu-current-filter nil)))
 
 ;;;###autoload
-(defun debbugs-gnu (severities &optional packages archivedp suppress)
+(defun debbugs-gnu (severities &optional packages archivedp suppress usertags)
   "List all outstanding Emacs bugs."
   (interactive
-   (let (archivedp)
+   (let (severities archivedp)
      (list
-      (completing-read-multiple
-       "Severities: "
-       (mapcar 'cadr (cdr (get 'debbugs-gnu-default-severities 'custom-type)))
-       nil t (mapconcat 'identity debbugs-gnu-default-severities ","))
-      ;; The optional parameters are asked only when there is a prefix.
+      (setq severities
+	    (completing-read-multiple
+	     "Severities: " debbugs-gnu-all-severities nil t
+	     (mapconcat 'identity debbugs-gnu-default-severities ",")))
+      ;; The next parameters are asked only when there is a prefix.
       (if current-prefix-arg
 	  (completing-read-multiple
-	   "Packages: "
-	   (mapcar 'cadr (cdr (get 'debbugs-gnu-default-packages 'custom-type)))
-	   nil t (mapconcat 'identity debbugs-gnu-default-packages ","))
+	   "Packages: " debbugs-gnu-all-packages nil t
+	   (mapconcat 'identity debbugs-gnu-default-packages ","))
 	debbugs-gnu-default-packages)
       (when current-prefix-arg
 	(setq archivedp (y-or-n-p "Show archived bugs?")))
       (when (and current-prefix-arg (not archivedp))
-	(y-or-n-p "Suppress unwanted bugs?")))))
+	(y-or-n-p "Suppress unwanted bugs?"))
+      ;; This one must be asked for severity "tagged".
+      (when (member "tagged" severities)
+	(split-string (read-string "User tag(s): ") "," t)))))
 
   ;; Initialize variables.
   (when (and (file-exists-p debbugs-gnu-persistency-file)
@@ -420,6 +429,9 @@ marked as \"client-side filter\"."
       (add-to-list 'debbugs-gnu-current-query (cons 'package package))))
   (when archivedp
     (add-to-list 'debbugs-gnu-current-query '(archive . "1")))
+  (dolist (usertag (if (consp usertags) usertags (list usertags)))
+    (when (not (zerop (length usertag)))
+      (add-to-list 'debbugs-gnu-current-query (cons 'usertag usertag))))
 
   (unwind-protect
       (let ((hits debbugs-gnu-default-hits-per-page)
@@ -482,9 +494,12 @@ marked as \"client-side filter\"."
 	(tagged (when (member '(severity . "tagged") query)
 		  (copy-sequence debbugs-gnu-local-tags)))
 	(phrase (assoc 'phrase query))
-	args)
-    ;; Compile query arguments.
-    (unless query
+	usertags args)
+    ;; Compile query and usertags arguments.
+    (dolist (elt query)
+      (when (equal (car elt) 'usertag)
+	(add-to-list 'usertags (cdr elt))))
+    (unless (or query usertags)
       (dolist (elt debbugs-gnu-default-packages)
 	(setq args (append args (list :package elt)))))
     (dolist (elt query)
@@ -505,20 +520,28 @@ marked as \"client-side filter\"."
 		 (list (intern (concat ":" (symbol-name (car elt))))
 		       (cdr elt)))))))
 
-    (cond
-     ;; If the query contains only the pseudo-severity "tagged", we
-     ;; return just the local tagged bugs.
-     ((and tagged (not (memq :severity args)))
-      (sort tagged '<))
-     ;; A full text query.
-     (phrase
-      (append
-       (mapcar
-	(lambda (x) (cdr (assoc "id" x)))
-	(apply 'debbugs-search-est args))
-       tagged))
-     ;; Otherwise, we retrieve the bugs from the server.
-     (t (sort (append (apply 'debbugs-get-bugs args) tagged) '<)))))
+    (sort
+     (cond
+      ;; If the query contains only the pseudo-severity "tagged", we
+      ;; return just the local tagged bugs.
+      ((and tagged (not usertags) (not (memq :severity args))) tagged)
+      ;; A full text query.
+      (phrase
+       (append
+	(mapcar
+	 (lambda (x) (cdr (assoc "id" x)))
+	 (apply 'debbugs-search-est args))
+	tagged))
+      ;; User tags.
+      (usertags
+       (let (result)
+	 (dolist (elt packages result)
+	   (setq result
+		 (append result (apply 'debbugs-get-usertag elt usertags))))))
+      ;; Otherwise, we retrieve the bugs from the server.
+      (t (append (apply 'debbugs-get-bugs args) tagged)))
+     ;; Sort function.
+     '<)))
 
 (defvar debbugs-gnu-current-widget nil)
 (defvar debbugs-gnu-current-limit nil)
@@ -527,13 +550,16 @@ marked as \"client-side filter\"."
 
 (defun debbugs-gnu-show-reports (widget)
   "Show bug reports as given in WIDGET property :bug-ids."
+  ;; The tabulated mode sets several local variables.  We must get rid
+  ;; of them.
+  (when (get-buffer (widget-get widget :buffer-name))
+    (kill-buffer (widget-get widget :buffer-name)))
   (pop-to-buffer (get-buffer-create (widget-get widget :buffer-name)))
   (debbugs-gnu-mode)
   (let ((inhibit-read-only t)
 	(debbugs-port "gnu.org"))
     (erase-buffer)
-    (set (make-local-variable 'debbugs-gnu-current-widget)
-	 widget)
+    (set (make-local-variable 'debbugs-gnu-current-widget) widget)
 
     (dolist (status (apply 'debbugs-get-status (widget-get widget :bug-ids)))
       (let* ((id (cdr (assq 'id status)))
@@ -930,13 +956,19 @@ Subject fields."
 (defun debbugs-gnu-current-status ()
   (get-text-property (line-beginning-position) 'tabulated-list-id))
 
-(defun debbugs-gnu-display-status (status)
-  "Display the status of the report on the current line."
-  (interactive (list (debbugs-gnu-current-status)))
+(defun debbugs-gnu-current-query ()
+  (widget-get debbugs-gnu-current-widget :query))
+
+(defun debbugs-gnu-display-status (query status)
+  "Display the query and status of the report on the current line."
+  (interactive (list (debbugs-gnu-current-query)
+		     (debbugs-gnu-current-status)))
   (pop-to-buffer "*Bug Status*")
   (erase-buffer)
-  (pp status (current-buffer))
-  (goto-char (point-min)))
+  (when query (pp query (current-buffer)))
+  (when status (pp status (current-buffer)))
+  (goto-char (point-min))
+  (special-mode))
 
 (defun debbugs-gnu-select-report ()
   "Select the report on the current line."
