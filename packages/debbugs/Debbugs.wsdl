@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- Copyright (C) 2011  Free Software Foundation, Inc.
+<!-- Copyright (C) 2011, 2012  Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -18,8 +18,8 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <!-- This file describes the bindings of the debbugs SOAP interface
-(see <http://wiki.debian.org/DebbugsSoapInterface>).  The operations
-"get_usertag" and "get_versions" are not contained (yet). -->
+(see <http://wiki.debian.org/DebbugsSoapInterface>).  The operation
+"get_versions" is not contained (yet). -->
 
 <wsdl:definitions
     name="Debbugs/SOAP"
@@ -116,6 +116,14 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>. -->
     <wsdl:part name="soapenc:Array" type="types:ArrayOfBugNumber"/>
   </wsdl:message>
 
+  <wsdl:message name="get_usertagRequest">
+    <wsdl:part name="user" type="xsd:string"/>
+    <!-- We do not support tags -->
+  </wsdl:message>
+  <wsdl:message name="get_usertagResponse">
+    <wsdl:part name="s-gensym3" type="xsd:anyType"/>
+  </wsdl:message>
+
   <wsdl:message name="newest_bugsRequest">
     <wsdl:part name="amount" type="xsd:int"/>
   </wsdl:message>
@@ -170,6 +178,21 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>. -->
 	    use="encoded"/>
       </wsdl:input>
       <wsdl:output message="tns:get_bugsResponse">
+        <soap:body
+	    encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+	    namespace="urn:Debbugs/SOAP"
+	    use="encoded"/>
+      </wsdl:output>
+    </wsdl:operation>
+
+    <wsdl:operation name="get_usertag" parameterOrder="user">
+      <wsdl:input message="tns:get_usertagRequest">
+        <soap:body
+	    encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+	    namespace="urn:Debbugs/SOAP"
+	    use="encoded"/>
+      </wsdl:input>
+      <wsdl:output message="tns:get_usertagResponse">
         <soap:body
 	    encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
 	    namespace="urn:Debbugs/SOAP"
@@ -251,6 +274,22 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>. -->
 	    use="encoded"/>
       </wsdl:input>
       <wsdl:output name="get_bugsResponse">
+        <wsdlsoap:body
+	    encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+	    namespace="urn:Debbugs/SOAP"
+	    use="encoded"/>
+      </wsdl:output>
+    </wsdl:operation>
+
+    <wsdl:operation name="get_usertag">
+      <wsdlsoap:operation soapAction="Debbugs/SOAP"/>
+      <wsdl:input name="get_tagRequest">
+        <wsdlsoap:body
+	    encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+	    namespace="urn:Debbugs/SOAP"
+	    use="encoded"/>
+      </wsdl:input>
+      <wsdl:output name="get_tagResponse">
         <wsdlsoap:body
 	    encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
 	    namespace="urn:Debbugs/SOAP"

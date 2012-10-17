@@ -27,8 +27,7 @@
 ;; This package provides some basic functions to access a debbugs SOAP
 ;; server (see <http://wiki.debian.org/DebbugsSoapInterface>).
 
-;; The SOAP functions "get_usertag" and "get_versions" are not
-;; implemented (yet).
+;; The SOAP function "get_versions" is not implemented (yet).
 
 ;;; Code:
 
@@ -274,7 +273,7 @@ Example:
 
   \(debbugs-get-status 10)
 
-  => ;; Attributes with empty values are not show
+  => ;; Attributes with empty values are not shown
      \(\(\(bug_num . 10)
        \(source . \"unknown\")
        \(date . 1203606305.0)
@@ -320,6 +319,46 @@ Example:
 	       (setcdr y (split-string (cdr y) ",\\| " t))))
 	   (cdr (assoc 'value x))))
        object))))
+
+(defun debbugs-get-usertag (user &rest tags)
+  "Return a list of bug numbers which are tagged by USER.
+
+USER, a string, is either the email address of the user who has
+applied a user tag, or a pseudo-user like \"emacs\".  Usually,
+pseudo-users are package names.
+
+TAGS is a list of strings applied as user tags.  The returning
+bug numbers list is filtered for these tags.
+
+If TAGS is nil, no bug numbers will be returned but a list of
+existing tags for USER.
+
+Example:
+
+  \(debbugs-get-usertag \"emacs\")
+
+  => (\"www\" \"solaris\" \"ls-lisp\" \"cygwin\")
+
+  \(debbugs-get-usertag \"emacs\" \"www\" \"cygwin\")
+
+  => (807 1223 5637)"
+  (when (stringp user)
+    (let ((object
+	   (car (soap-invoke debbugs-wsdl debbugs-port "get_usertag" user)))
+	  result)
+      (if (null tags)
+	  ;; Return the list of existing tags.
+	  (mapcar
+	   (lambda (x) (symbol-name (car x)))
+	   object)
+
+	;; Return bug numbers.
+	(mapcar
+	 (lambda (x)
+	   (when (member (symbol-name (car x)) tags)
+	     (setq result (append (cdr x) result))))
+	 object)
+	(sort result '<)))))
 
 (defun debbugs-get-bug-log (bug-number)
   "Return a list of messages related to BUG-NUMBER.
