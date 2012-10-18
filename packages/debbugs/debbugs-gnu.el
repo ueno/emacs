@@ -389,7 +389,7 @@ marked as \"client-side filter\"."
 	  debbugs-gnu-current-filter nil)))
 
 ;;;###autoload
-(defun debbugs-gnu (severities &optional packages archivedp suppress usertags)
+(defun debbugs-gnu (severities &optional packages archivedp suppress tags)
   "List all outstanding Emacs bugs."
   (interactive
    (let (severities archivedp)
@@ -429,9 +429,9 @@ marked as \"client-side filter\"."
       (add-to-list 'debbugs-gnu-current-query (cons 'package package))))
   (when archivedp
     (add-to-list 'debbugs-gnu-current-query '(archive . "1")))
-  (dolist (usertag (if (consp usertags) usertags (list usertags)))
-    (when (not (zerop (length usertag)))
-      (add-to-list 'debbugs-gnu-current-query (cons 'usertag usertag))))
+  (dolist (tag (if (consp tags) tags (list tags)))
+    (when (not (zerop (length tag)))
+      (add-to-list 'debbugs-gnu-current-query (cons 'tag tag))))
 
   (unwind-protect
       (let ((hits debbugs-gnu-default-hits-per-page)
@@ -490,16 +490,13 @@ marked as \"client-side filter\"."
 
 (defun debbugs-gnu-get-bugs (query)
   "Retrieve bugs numbers from debbugs.gnu.org according search criteria."
-  (let ((debbugs-port "gnu.org")
-	(tagged (when (member '(severity . "tagged") query)
-		  (copy-sequence debbugs-gnu-local-tags)))
-	(phrase (assoc 'phrase query))
-	usertags args)
-    ;; Compile query and usertags arguments.
-    (dolist (elt query)
-      (when (equal (car elt) 'usertag)
-	(add-to-list 'usertags (cdr elt))))
-    (unless (or query usertags)
+  (let* ((debbugs-port "gnu.org")
+	 (tags (assoc 'tag query))
+	 (local-tags (and (member '(severity . "tagged") query) (not tags)))
+	 (phrase (assoc 'phrase query))
+	 args)
+    ;; Compile query arguments.
+    (unless (or query tags)
       (dolist (elt debbugs-gnu-default-packages)
 	(setq args (append args (list :package elt)))))
     (dolist (elt query)
@@ -522,24 +519,18 @@ marked as \"client-side filter\"."
 
     (sort
      (cond
-      ;; If the query contains only the pseudo-severity "tagged", we
-      ;; return just the local tagged bugs.
-      ((and tagged (not usertags) (not (memq :severity args))) tagged)
+      ;; If the query contains the pseudo-severity "tagged", we return
+      ;; just the local tagged bugs.
+      (local-tags (copy-sequence debbugs-gnu-local-tags))
       ;; A full text query.
       (phrase
-       (append
-	(mapcar
-	 (lambda (x) (cdr (assoc "id" x)))
-	 (apply 'debbugs-search-est args))
-	tagged))
+       (mapcar
+	(lambda (x) (cdr (assoc "id" x)))
+	(apply 'debbugs-search-est args)))
       ;; User tags.
-      (usertags
-       (let (result)
-	 (dolist (elt packages result)
-	   (setq result
-		 (append result (apply 'debbugs-get-usertag elt usertags))))))
+      (tags (apply 'debbugs-get-usertag args))
       ;; Otherwise, we retrieve the bugs from the server.
-      (t (append (apply 'debbugs-get-bugs args) tagged)))
+      (t (apply 'debbugs-get-bugs args)))
      ;; Sort function.
      '<)))
 
@@ -964,10 +955,12 @@ Subject fields."
   (interactive (list (debbugs-gnu-current-query)
 		     (debbugs-gnu-current-status)))
   (pop-to-buffer "*Bug Status*")
-  (erase-buffer)
-  (when query (pp query (current-buffer)))
-  (when status (pp status (current-buffer)))
-  (goto-char (point-min))
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (when query (pp query (current-buffer)))
+    (when status (pp status (current-buffer)))
+    (goto-char (point-min)))
+  (set-buffer-modified-p nil)
   (special-mode))
 
 (defun debbugs-gnu-select-report ()
@@ -1053,7 +1046,8 @@ removed instead."
 	    "invalid"
 	    "reassign"
 	    "patch" "wontfix" "moreinfo" "unreproducible" "fixed" "notabug"
-	    "pending" "help" "security" "confirmed")
+	    "pending" "help" "security" "confirmed"
+	    "usertag")
 	  nil t)
 	 current-prefix-arg))
   (let* ((id (or debbugs-gnu-bug-number	; Set on group entry.
@@ -1105,6 +1099,14 @@ removed instead."
 	       ((equal message "invalid")
 		(format "tags %d notabug\ntags %d wontfix\nclose %d\n"
 			id id id))
+	       ((equal message "usertag")
+		(format "user %s\nusertag %d %s\n"
+			(completing-read
+			 "Package name or email address: "
+			 (append
+			  debbugs-gnu-all-packages (list user-mail-address))
+			 nil nil (car debbugs-gnu-default-packages))
+			id (read-string "User tag: ")))
 	       (t
 		(format "tags %d%s %s\n"
 			id (if reverse " -" "")

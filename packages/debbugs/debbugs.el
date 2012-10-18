@@ -320,45 +320,81 @@ Example:
 	   (cdr (assoc 'value x))))
        object))))
 
-(defun debbugs-get-usertag (user &rest tags)
-  "Return a list of bug numbers which are tagged by USER.
+(defun debbugs-get-usertag (&rest query)
+  "Return a list of bug numbers which match QUERY.
 
-USER, a string, is either the email address of the user who has
-applied a user tag, or a pseudo-user like \"emacs\".  Usually,
-pseudo-users are package names.
+QUERY is a sequence of keyword-value pairs where the values are
+strings, i.e. :KEYWORD \"VALUE\" [:KEYWORD \"VALUE\"]*
 
-TAGS is a list of strings applied as user tags.  The returning
-bug numbers list is filtered for these tags.
+Valid keywords are:
 
-If TAGS is nil, no bug numbers will be returned but a list of
-existing tags for USER.
+  :package -- The value is the name of the package a bug belongs
+  to, like \"emacs\", \"coreutils\", \"gnus\", or \"tramp\".  It
+  can also be an email address of a user who has applied a user
+  tag.  The special email address \"me\" is used as pattern,
+  replaced with `user-mail-address'.  There must be at least one
+  such entry; it is recommended to have exactly one.
+
+  :tag -- A string applied as user tag.  Often, it is a
+  subproduct identification, like \"cedet\" or \"tramp\" for the
+  package \"emacs\".
+
+If there is no :tag entry, no bug numbers will be returned but a list of
+existing user tags for :package.
 
 Example:
 
-  \(debbugs-get-usertag \"emacs\")
+  \(debbugs-get-usertag :package \"emacs\")
 
   => (\"www\" \"solaris\" \"ls-lisp\" \"cygwin\")
 
-  \(debbugs-get-usertag \"emacs\" \"www\" \"cygwin\")
+  \(debbugs-get-usertag :package \"emacs\" :tag \"www\" :tag \"cygwin\")
 
   => (807 1223 5637)"
-  (when (stringp user)
-    (let ((object
-	   (car (soap-invoke debbugs-wsdl debbugs-port "get_usertag" user)))
-	  result)
-      (if (null tags)
-	  ;; Return the list of existing tags.
-	  (mapcar
-	   (lambda (x) (symbol-name (car x)))
-	   object)
 
-	;; Return bug numbers.
-	(mapcar
-	 (lambda (x)
-	   (when (member (symbol-name (car x)) tags)
-	     (setq result (append (cdr x) result))))
-	 object)
-	(sort result '<)))))
+  (let (user tags kw key val object result)
+    ;; Check query.
+    (while (and (consp query) (<= 2 (length query)))
+      (setq kw (pop query)
+	    val (pop query))
+      (unless (and (keywordp kw) (stringp val))
+	(error "Wrong query: %s %s" kw val))
+      (setq key (substring (symbol-name kw) 1))
+      (case kw
+	((:package)
+	 ;; Value shall be one word.
+	 (if (string-match "\\`\\S-+\\'" val)
+	     (progn
+	       (when (string-equal "me" val)
+		 (setq val user-mail-address))
+	       (when (string-match "<\\(.+\\)>" val)
+		 (setq val (match-string 1 val)))
+	       (add-to-list 'user val))
+	   (error "Wrong %s: %s" key val)))
+	((:tag)
+	 ;; Value shall be one word.  Extract email address, if existing.
+	 (if (string-match "\\`\\S-+\\'" val)
+	     (add-to-list 'tags val)
+	   (error "Wrong %s: %s" key val)))
+	(t (error "Unknown key: %s" kw))))
+
+    (unless (null query)
+      (error "Unknown key: %s" (car query)))
+    (unless (= (length user) 1)
+      (error "There must be exactly one :package entry"))
+
+    (setq
+     object
+     (car (soap-invoke debbugs-wsdl debbugs-port "get_usertag" (car user))))
+
+    (if (null tags)
+	;; Return the list of existing tags.
+	(mapcar (lambda (x) (symbol-name (car x))) object)
+
+      ;; Return bug numbers.
+      (dolist (elt object result)
+	(when (member (symbol-name (car elt)) tags)
+	  (setq result (append (cdr elt) result)))))))
 
 (defun debbugs-get-bug-log (bug-number)
   "Return a list of messages related to BUG-NUMBER.
