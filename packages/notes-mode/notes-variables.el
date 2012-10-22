@@ -1,13 +1,25 @@
+;;; notes-variables.el --- Configuration variables for notes-mode
 
-;;;
-;;; notes-variables.el
-;;; $Id: notes-variables.el,v 1.30 2007/11/06 02:45:55 johnh Exp $
-;;;
-;;; Copyright (C) 1994-2000 by John Heidemann
-;;; Comments to <johnh@isi.edu>.
-;;;
-;;; This file is under the Gnu Public License, version 2.
-;;;
+;; Copyright (C) 1994-2000,2012  Free Software Foundation, Inc.
+
+;; Author: <johnh@isi.edu>
+
+;; This file is part of GNU Emacs.
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; GNU Emacs is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
 
 ;;
 ;; This file lists all parameters you might wish to change in
@@ -17,9 +29,11 @@
 ;;	(setq your-variable-to-change 'your-new value)
 ;;
 
+;;; Code:
+
 ;; xxx: if part of emacs, this should be probably be set to exec-directory (?)
-(defvar notes-utility-dir "/home/johnh/NOTES/BIN"
-  "Location of notes utility programs")
+(defconst notes-utility-dir (file-name-directory load-file-name)
+  "Location of notes utility programs.")
 
 ;;
 ;; Notice:  several notes parameters are defined in your
@@ -29,66 +43,57 @@
 ;;
 ;; To make this fast, we cache the configuration in a .notesrc.el
 ;; file.  We only have to invoke mkconfig when that file is out-of-date.
-;; This optimization is very important because notes-variables is 
+;; This optimization is very important because notes-variables is
 ;; required every time emacs is started.
 ;;
-(save-excursion
-  (if (null (file-exists-p (concat notes-utility-dir "/mkconfig")))
-      (progn
-	;;
-	;; A common user error is that people don't
-	;; follow the installation instructions.
-	;; Part of installation is chaning my local paths (with
-	;; johnh in them) to whatever you use on your system.
-	;; If the following error is triggered, it's probably
-	;; because the user didn't RTFM (or even TF README)
-	;; and just tried to run notes-mode in place.
-	;; DON'T DO THAT!  Follow the installation instructions.
-	;;
-	(error "notes-mode is incorrectly installed.  Consult the INSTALL section of README.")))
+(save-current-buffer
+  (if (null (file-exists-p (expand-file-name "mkconfig" notes-utility-dir)))
+      (error "Notes-mode is incorrectly installed."))
   (let*
       ((source-file (expand-file-name "~/.notesrc"))
-       (cache-file (expand-file-name "~/.notesrc.el"))
-       (cache-buf (set-buffer (find-file-noselect cache-file))))
-    (if (and 
+       (cache-file (expand-file-name "~/.notesrc.el")))
+    (if (and
 	 (not (file-exists-p source-file))
 	 (not noninteractive))
 	(progn
 	  (require 'notes-first)
 	  (notes-first-use-init)))
-    (if (and  ; requirements for a valid cache-file
-	 (file-exists-p cache-file)
-	 (if (file-exists-p source-file)
-	     (file-newer-than-file-p cache-file source-file)
-	   t)
-	 (file-newer-than-file-p cache-file (concat notes-utility-dir "/mkconfig")))
-	t ; cache is up-to-date
-      ;; otherwise, refresh the cache
-      (erase-buffer)
-      (call-process (concat notes-utility-dir "/mkconfig") nil t nil "elisp")
-      (save-buffer cache-buf)
-      (set-file-modes cache-file 420)) ; protect it => mode 0644
-    (eval-current-buffer)
-    (kill-buffer cache-buf)))
+    (with-temp-buffer
+      (if (and ;; Requirements for a valid cache-file.
+           (file-exists-p cache-file)
+           (if (file-exists-p source-file)
+               (file-newer-than-file-p cache-file source-file)
+             t)
+           (file-newer-than-file-p
+            cache-file (expand-file-name "mkconfig" notes-utility-dir)))
+          (insert-file-contents cache-file) ;; Cache is up-to-date.
+        ;; Otherwise, refresh the cache.
+        (call-process (expand-file-name "mkconfig" notes-utility-dir)
+                      nil t nil "elisp")
+        (write-region (point-min) (point-max) cache-file)
+        (set-file-modes cache-file #o644)) ;; Protect it => mode 0644.
+      (eval-buffer))))
 
-
-(setq auto-mode-alist
-      (cons (cons
-	     (concat notes-int-glob "/" notes-file-glob ".?$")
-	     'notes-mode)
-	    auto-mode-alist))
+;; notes-int-glob and notes-file-glob should have been set in ~/.notesrc.el.
+(add-to-list 'auto-mode-alist
+             (cons
+              ;; FIXME: auto-mode-alist actually takes a regexp, not a glob.
+              ;; The default globs happen to fall within the intersection of
+              ;; regexps and globs, but we shouldn't rely on it!
+              (concat notes-int-glob "/" notes-file-glob ".?\\'")
+              'notes-mode))
 
 ;;; xxx: most of these should use defcustom or something similar, I presume.
 (defvar notes-w3-alternate-url 'browse-url
   "* A function to call when notes-w3-url cannot handle a complex URL.
-It now goes through the emacs browse-url package,
+It now goes through the Emacs `browse-url' package,
 but you could also set it manually (say, to w3-fetch).")
 
 (defvar notes-use-font-lock t
   "* Enable notes fontification.")
 
 (defvar notes-use-outline-mode t
-  "* Enable outline-minor-mode in all notes buffers?")
+  "* Enable `outline-minor-mode' in all notes buffers?")
 
 (defvar notes-index-fontify-dates nil
   "* Fontify dates in notes-index-mode.
@@ -137,77 +142,13 @@ nil: don't auto-update anything.
 1: update prevnext, but don't autosave the old buffer
 2: update prevnext and autosave the old buffer.")
 
-(defvar notes-running-xemacs (string-match "XEmacs\\|Lucid" emacs-version)
-  "*In XEmacs or Lucid Emacs?.")
-
-;;;
-;;; prep the load path using the notes-lisp-dir
-;;; code stolen from the auctex styles files (specifically tex-site.el)
-;;;		-- Kannan
-;;;		   Wed Apr  7 09:40:27 EDT 1999
-;;;
-(if (boundp 'notes-lisp-dir)
-    (or (assoc notes-lisp-dir (mapcar 'list load-path)) ;No `member' yet.
-	(assoc (substring notes-lisp-dir 0 -1) ;Without trailing slash.
-	       (mapcar 'list load-path))
-	(setq load-path (cons notes-lisp-dir load-path))))
-
-(if notes-running-xemacs
+(if (featurep 'xemacs)
     (require 'notes-xemacs)
   (require 'notes-emacs))
 
 (defvar notes-platform-inited nil
-  "Have we inited our platform (xemacs/emacs)?")
-
-;;;
-;;; autoloads
-;;;
-
-
-;;;### (autoloads (notes-index-mode) "notes-index-mode" "notes-index-mode.el" (12248 45843))
-;;; Generated autoloads from notes-index-mode.el
-
-(autoload (quote notes-index-mode) "notes-index-mode" "\
-Notes-index-mode with mouse support.
-
-You may wish to change notes-bold-face and notes-use-font-lock.
-
-Key bindings are:
-\\{notes-index-mode-map}" t nil)
-
-;;;###autoload
-(autoload (quote notes-index-todays-link) "notes-index-mode" "\
-* Open the notes file for today." t nil)
-
-;;;***
-
-;;;### (autoloads (notes-w3-follow-link-mouse notes-w3-follow-link notes-w3-file) "notes-url" "notes-url.el" (12248 46828))
-;;; Generated autoloads from notes-url.el
-
-(autoload (quote notes-w3-url) "notes-url" "\
-Find a link to an ftp site - simple transformation to ange-ftp format.
-Takes the URL as an argument.  Optionally you specify
-WHERE the information should appear (either 'otherwindow or not)." nil nil)
-
-(autoload (quote notes-w3-follow-link) "notes-url" "\
-* Follow the URL at the point.
-NEEDSWORK:  should handle (by ignoring) an optional \"URL:\" tag." t nil)
-
-(autoload (quote notes-w3-follow-link-mouse) "notes-url" "\
-* Follow the URL where the mouse is." t nil)
-
-;;;***
-
-
-;;;### (autoloads (notes-underline-line notes-end-of-defun notes-beginning-of-defun) "notes-mode" "notes-mode.el" (12250 9363))
-;;; Generated autoloads from notes-mode.el
-
-(autoload (quote notes-underline-line) "notes-mode" "\
-*Create a row of dashes as long as this line, or adjust the current underline." t nil)
-
-;;;***
-
-(autoload 'notes-mode "notes-mode" "autoloaded notes-mode" t nil)
+  "Have we inited our platform (XEmacs/Emacs)?")
 
 (run-hooks 'notes-variables-load-hooks)
 (provide 'notes-variables)
+;;; notes-variables.el ends here

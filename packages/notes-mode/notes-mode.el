@@ -1,13 +1,29 @@
+;;; notes-mode.el --- Indexing system for on-line note-taking
 
-;;;
-;;; notes-mode.el
-;;; $Id: notes-mode.el,v 1.71 2009/08/20 20:00:02 johnh Exp $
-;;;
-;;; Copyright (C) 1994-2007 by John Heidemann
-;;; Comments to <johnh@isi.edu>.
-;;;
-;;; This file is under the Gnu Public License.
-;;;
+;;; Copyright (C) 1994-2007,2012  Free Software Foundation, Inc.
+
+;; Author: <johnh@isi.edu>.
+
+;; This file is part of GNU Emacs.
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; GNU Emacs is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+
+
+;;; Commentary:
+;; 
+
+;;; Code:
 
 (require 'notes-variables)
 (require 'notes-aux)
@@ -20,9 +36,9 @@
 (defconst notes-beginning-of-defun-regexp "^\\* .*\n\\-"
   "Regexp matching the beginning of notes section.")
 
-(defvar notes-default-tab-binding nil
+(defvar notes-default-tab-binding (global-key-binding "\t")
   "Saved tab binding for notes-complete-subject.")
-(defvar notes-default-return-binding nil
+(defvar notes-default-return-binding (global-key-binding "\r")
   "Saved return binding for notes-electric-return.")
 
 
@@ -39,12 +55,19 @@
       (goto-char old-point)
       (if (looking-at "^-")  ;; handle starting on the underline under a title
 	  (forward-char 1))
-      (generic-beginning-of-defun notes-beginning-of-defun-regexp))))
+      (re-search-backward notes-beginning-of-defun-regexp nil 'to-limit))))
 
 (defun notes-end-of-defun ()
   "Go to the end of a notes ``section''."
   (interactive)
-  (generic-end-of-defun notes-beginning-of-defun-regexp))
+  (let ((regexp notes-beginning-of-defun-regexp))
+    (if (looking-at regexp)
+        (goto-char (match-end 0)))
+    ;; Find next section and leave cursor at section beginning
+    (if (re-search-forward regexp nil 'to-limit)
+        (re-search-backward regexp 0 t)
+      ;;(goto-char restore-point)
+      )))
 
 (defun notes-follow-link (which)
   "Go to the WHICH link for this topic.
@@ -111,7 +134,7 @@ we go to the last note based upon the index file."
 (defvar notes-complete-subject-abbrevs-alist
   '(("SP2010" "USC/Classes/CS551/SP2010")
     ("FA2011" "USC/Classes/CS551/FA2011"))
-  "notes-complete-subject-abbrevs-alist provides simple substitution of subjects.
+  "Alist of simple substitution of subjects.
 If subject completion is requested, then subject that matches
 the left-side of an alist value is replaced by the right-side value.")
 
@@ -137,8 +160,8 @@ Currently this is just a hack."
 	(call-interactively notes-default-tab-binding)
       ;; Complete the title.
       (if (null notes-subject-table)
-	  (save-excursion
-	    (find-file-noselect (concat notes-dir "/index"))))
+	  (save-excursion ;; FIXME: Why??
+	    (find-file-noselect (expand-file-name "index" notes-dir))))
       ;; Do completion.
       ;; Run completer if it's loaded,
       ;; otherwise do our own thing.
@@ -154,21 +177,21 @@ Currently this is just a hack."
 				       (if (stringp full-subject)
 					   full-subject
 					 subject)))
-	(delete-region (get-beginning-of-line) (get-end-of-line))
+	(delete-region (line-beginning-position) (line-end-position))
 	(insert "* " (notes-complete-subject-abbrevs subject))))
       	(setq completion-ignore-case old-completion-ignore-case))))
 
 (defun notes-fix-prevnext-this-entry ()
-  "* Fix up the prev link for the current entry,
-if necessary.  Currently this code only handles brand new entries."
+  "Fix up the prev link for the current entry, if necessary.
+Currently this code only handles brand new entries."
   ;; Contributed from Takashi Nishimoto <g96p0935@mse.waseda.ac.jp>.
   ;; Thanks!
   (interactive)
   (let ((subject (notes-extract-subject nil t))
         (this-url (notes-current-url))
         last-url)
-    (save-excursion
-      (set-buffer (find-file-noselect (concat notes-dir "/index")))
+    (with-current-buffer (find-file-noselect
+                          (expand-file-name "index" notes-dir))
       (goto-char (point-min))
       (if (re-search-forward
            (concat "^" (regexp-quote subject) ":.* \\([0-9]+\\)$")
@@ -208,7 +231,7 @@ if necessary.  Currently this code only handles brand new entries."
     (call-interactively notes-default-return-binding)))
 
 (defun notes-current-url ()
-  "* Returns the notes-URL of the current entry around the current point."
+  "Return the notes-URL of the current entry around the current point."
   (let ((subject (notes-extract-subject nil t))
 	(date (file-name-nondirectory buffer-file-name)))
     (concat "<file:///"
@@ -292,7 +315,7 @@ Returns nil if we're not on as subject."
       (insert "\n\n"))))
 
 (defun notes-new-underline-line ()
-  "Underline a line with a row of dashes.  Moves the point after the dashes.
+  "Underline a line with a row of dashes.  Move point after the dashes.
 \\[notes-new-underline-line] reproduces leading spaces."
   (interactive)
   (let*
@@ -312,15 +335,15 @@ Returns nil if we're not on as subject."
   (save-excursion
     (save-excursion
       (forward-line 1)
-      (delete-region (get-beginning-of-line) (1+ (get-end-of-line))))
+      (delete-region (line-beginning-position) (1+ (line-end-position))))
     (notes-new-underline-line)))
 
 (defun notes-mode-initialize-note-from-cache ()
-  "Build a new note from the cache.  Returns valid cache contents or nil."
+  "Build a new note from the cache.  Return valid cache contents or nil."
   (save-excursion
     (let*
 	((new-buffer (current-buffer))
-	 (cache-file (concat notes-dir "/mknew.cache"))
+	 (cache-file (expand-file-name "mknew.cache" notes-dir))
 	 (buf (find-file cache-file))
 	 magic-line
 	 prev-file
@@ -380,16 +403,19 @@ Use the mknew cache if possible."
 	  (shell-command-on-region
 	   (point-min)
 	   (point-max)
-	   (concat notes-bin-dir "/" notes-mode-initialization-program " '"
+	   (concat (expand-file-name notes-mode-initialization-program
+                                     notes-bin-dir)
+                   " '"
+                   ;; FIXME: Use shell-quote-argument.
 		   (buffer-file-name) "'") 't)))))
   
 
 ;;;
 ;;; encryption
-;;; requires "PEM - PGP Enhanced Messaging for GNU Emacs"
-;;; from Roy Frederick Busdiecker, III (Rick)
-;;; or mailcrypt 3.4.x or >=3.5.x
-;;;
+;; requires "PEM - PGP Enhanced Messaging for GNU Emacs"
+;; from Roy Frederick Busdiecker, III (Rick)
+;; or mailcrypt 3.4.x or >=3.5.x
+;;
 
 (defvar notes-encryption-library 
   'mailcrypt
@@ -397,11 +423,11 @@ Use the mknew cache if possible."
 ;   ((fboundp 'mc-encrypt-region) 'mailcrypt)
 ;   ((fboundp 'npgp:encrypt-region) 'npgp)
 ;   (t nil))
-  "what pgp library to use")
+  "PGP library to use.")
 
 (defvar notes-encryption-sub-library
   'gpg
-  "what variant of mailcrypt to use ('pgp 'pgp50 'gpg).")
+  "Variant of mailcrypt to use (`pgp', `pgp50', or `gpg').")
 
 (defvar notes-encryption-npgp-userid nil
   "PGP key for the current user.")
@@ -578,7 +604,8 @@ Should have a leading 0x.")
       ((buf (get-buffer-create (concat "*notes on " subject "*"))))
     (pop-to-buffer buf)
     (erase-buffer)
-    (apply 'call-process (concat notes-bin-dir "/catsubject") nil buf t
+    (apply 'call-process (expand-file-name "catsubject" notes-bin-dir)
+           nil buf t
 	   (if regexp-subject
 	       (list "-m" subject)
 	     (list subject)))
@@ -609,27 +636,35 @@ Assumes working next/prev linkage between the entries."
 ;;; notes-mode
 ;;;
 
-;;
-;; This use of define-derived-mode is a crock---maybe
-;; it's better to eval it?
-;; suggestions are welcome.  ---johnh, 26-Oct-98
-;; 
-(if (fboundp 'indented-text-mode)
-    (define-derived-mode notes-mode indented-text-mode "Notes"
-      "See notes-mode-internal for documentation."
-      (notes-mode-internal))
-  (define-derived-mode notes-mode text-mode "Notes"
-      "See notes-mode-internal for documentation."
-    (notes-mode-internal)))
+(defvar notes-mode-map
+  (let ((map (make-sparse-keymap)))
+    ;; Random key-bindings.
+    (define-key map "\M-\C-a" 'notes-beginning-of-defun)
+    (define-key map "\M-\C-e" 'notes-end-of-defun)
+    (define-key map "\C-c\C-d" 'notes-decrypt-note)
+    (define-key map "\C-c\C-e" 'notes-encrypt-note)
+    (define-key map "\C-c\r" 'notes-w3-follow-link)
+    (define-key map "\C-c\C-p" 'notes-follow-prev-link)
+    (define-key map "\C-c\C-n" 'notes-follow-next-link)
+    (define-key map "\C-c\C-i" 'notes-goto-index-entry)
+    (define-key map "\C-c\C-k" 'notes-current-url-as-kill)
+    (define-key map "\C-c\C-s" 'notes-summarize-subject)
+    (define-key map "\C-c-" 'notes-underline-line)
+    ;; FIXME: Use completion-at-point-functions instead.
+    (define-key map "\t" 'notes-complete-subject)
+    ;; FIXME: Use post-self-insert-hook instead.
+    (define-key map "\r" 'notes-electric-return)
+    (define-key map "\n" 'notes-electric-return) ; a more common synonym
+    (notes-platform-bind-mouse map 'S-mouse-2 'notes-w3-follow-link-mouse)
+    map))
 
-
-(defun notes-mode-internal ()
+;;;###autoload
+(define-derived-mode notes-mode indented-text-mode "Notes"
   "Enable notes-mode for a buffer.
 
 Inside a notes buffer one can click on URLs and follow them to
 other notes files.
 
-Notes are fontified if notes-use-font-lock is set.
 See the file notes-variables.el for all customization options.
 To change options, (require 'notes-variables) in your .emacs
 and then change things.
@@ -639,10 +674,9 @@ and underlined with dashes.  Subjects can be completed
 with \\[notes-complete-subject] and are automatically underlined.
 
 You may wish to add this code to your .emacs file:
-    (setq auto-mode-alist
-  	(cons (cons \"/9[0-9][0-9][0-9][0-9][0-9].?$\" 'notes-mode)
-  	      auto-mode-alist))
-    (define-key global-map \"\C-cn\" 'notes-index-todays-link)
+    (add-to-list 'auto-mode-alist
+  	(cons \"/9[0-9][0-9][0-9][0-9][0-9].?\\\\'\" 'notes-mode))
+    (define-key global-map [?\\C-c ?n] 'notes-index-todays-link)
 to automatically enter notes mode.
 
 I have two suggestions for how to organize your notes files.
@@ -654,69 +688,30 @@ to easily move around the collection of files.
 
 The key-bindings of this mode are:
 \\{notes-mode-map}"
-  (interactive)  ;; just so documentation can come up
-
   (notes-platform-init)
 
-  ;; bug workaround:
-  ;; Emacs-19.30's define-derived-mode sets up a bogus syntax-table.
-  ;; (Evidence for the error is ``Wrong type argument: consp, nil''
-  ;; when typing in the buffer.)
-  ;;
-  ;; bug work-around 2:
-  ;; Klaus Zeitler <kzeitler@lucent.com>
-  ;; reports that the next line dies in emacs-21.1 with the error:
-  ;; "Attempt to make a chartable be its own parent".
-  ;; Work-around: more hackery.
-  (if (and (< emacs-major-version 21)
-	   (or (>= emacs-major-version 20) (>= emacs-minor-version 30)))
-      (set-syntax-table (setq notes-mode-syntax-table text-mode-syntax-table)))
-
-  ;; now set up the mode
+  ;; Now set up the mode.
   (auto-fill-mode 1)
 
-  ;; random key-bindings
-  (define-key notes-mode-map "\M-\C-a" 'notes-beginning-of-defun)
-  (define-key notes-mode-map "\M-\C-e" 'notes-end-of-defun)
-  (define-key notes-mode-map "\C-c\C-d" 'notes-decrypt-note)
-  (define-key notes-mode-map "\C-c\C-e" 'notes-encrypt-note)
-  (define-key notes-mode-map "\C-c\r" 'notes-w3-follow-link)
-  (define-key notes-mode-map "\C-c\C-p" 'notes-follow-prev-link)
-  (define-key notes-mode-map "\C-c\C-n" 'notes-follow-next-link)
-  (define-key notes-mode-map "\C-c\C-i" 'notes-goto-index-entry)
-  (define-key notes-mode-map "\C-c\C-k" 'notes-current-url-as-kill)
-  (define-key notes-mode-map "\C-c\C-s" 'notes-summarize-subject)
-  (define-key notes-mode-map "\C-c-" 'notes-underline-line)
-  (if (null notes-default-tab-binding)
-      (setq notes-default-tab-binding (key-binding "\t")))
-  (define-key notes-mode-map "\t" 'notes-complete-subject)
-  (if (null notes-default-return-binding)
-      (setq notes-default-return-binding (key-binding "\r")))
-  (define-key notes-mode-map "\r" 'notes-electric-return)
-  (define-key notes-mode-map "\n" 'notes-electric-return) ; a more common synonym
-  (notes-platform-bind-mouse notes-mode-map 'S-mouse-2 'notes-w3-follow-link-mouse)
+  ;; Imenu stuff.
+  (set (make-local-variable 'imenu-prev-index-position-function)
+       'notes-beginning-of-defun)
+  (set (make-local-variable 'imenu-extract-index-name-function)
+       'notes-extract-subject)
 
-  ;; imenu stuff 
-  (make-variable-buffer-local 'imenu-prev-index-position-function)
-  (make-variable-buffer-local 'imenu-extract-index-name-function)
-  (setq imenu-prev-index-position-function 'notes-beginning-of-defun)
-  (setq imenu-extract-index-name-function 'notes-extract-subject)
+  (set (make-local-variable 'font-lock-defaults)
+       `(notes-font-lock-keywords
+         t nil nil beginning-of-line))
 
-  (if notes-use-font-lock
-      (notes-platform-font-lock notes-font-lock-keywords))
-
-  ;; finally, try to fill in an empty note
-  (if (eq (point-min) (point-max))
+  ;; Finally, try to fill in an empty note.
+  (if (zerop (buffer-size))
       (notes-mode-initialize-note))
 
   ;; Enable outline-minor-mode (forcebly, in case someone already
   ;; has it in their text-mode hook).  Bug found by
   ;; Nils Ackermann <nils@nieback.de>.
   (if notes-use-outline-mode
-      (outline-minor-mode 1))
-
-  (delay-mode-hooks
-    (run-mode-hooks 'notes-mode-hooks)))
+      (outline-minor-mode 1)))
 
 
 
@@ -725,4 +720,4 @@ The key-bindings of this mode are:
 
 (run-hooks 'notes-mode-load-hooks)
 (provide 'notes-mode)
-
+;;; notes-mode.el ends here

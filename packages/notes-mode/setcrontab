@@ -2,7 +2,7 @@
 
 #
 # setcrontab
-# Copyright (C) 1996 by John Heidemann
+# Copyright (C) 1996,2012  Free Software Foundation, Inc.
 # $Id: setcrontab,v 1.2 2002/01/03 04:35:18 johnh Exp $
 #
 

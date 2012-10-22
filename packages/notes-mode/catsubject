@@ -4,7 +4,7 @@
 # catsubject
 # $Id: catsubject,v 1.7 2003/05/23 16:26:24 johnh Exp $
 #
-# Copyright (C) 1996 by John Heidemann.
+# Copyright (C) 1996,2012  Free Software Foundation, Inc.
 # Comments to <johnh@isi.edu>.
 #
 # This file is under the Gnu Public License, version 2.
@@ -45,7 +45,7 @@ my(%opts);
 #}
 
 use POSIX;
-BEGIN { unshift(@INC, "/home/johnh/NOTES/BIN"); };
+BEGIN { unshift(@INC, $ENV{'NOTES_BIN_DIR'}); };
 use NotesVars;
 use Notes;
 use NotesIndex;
