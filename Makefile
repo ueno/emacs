@@ -5,7 +5,7 @@ EMACS=emacs
 ARCHIVE_TMP=archive-tmp
 SITE_DIR=site
 
-.PHONY: archive-tmp process-archive archive-full org-fetch clean all
+.PHONY: archive-tmp process-archive archive-full org-fetch clean all do-it
 
 ## Set up the source files for direct usage, by pointing
 ## `package-directory-list' to the site/ directory.
@@ -13,6 +13,10 @@ site: packages
 	mkdir -p $(SITE_DIR)
 	$(EMACS) -batch -l $(CURDIR)/admin/archive-contents.el \
 	  --eval "(batch-make-site-dir \"packages\" \"$(SITE_DIR)\")"
+
+site/%: do-it
+	$(EMACS) -batch -l $(CURDIR)/admin/archive-contents.el \
+	  --eval "(progn (setq debug-on-error t) (batch-make-site-package \"$@\"))"
 
 ## Deploy the package archive to archive/, with packages in
 ## archive/packages/:
