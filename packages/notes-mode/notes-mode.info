@@ -1,5 +1,7 @@
-This is notes-mode.info, produced by makeinfo version 4.13 from notes-mode.texi.
+This is notes-mode.info, produced by makeinfo version 4.13 from
+notes-mode.texi.
 
+INFO-DIR-SECTION Emacs
 START-INFO-DIR-ENTRY
 * Notes-mode: (notes-mode).         Organizing on-line note-taking.
 END-INFO-DIR-ENTRY
@@ -9,21 +11,19 @@ END-INFO-DIR-ENTRY
    This file documents notes-mode, a package for organizing on-line
 note-taking.
 
-   Copyright (C) 1994-1996 by John Heidemann
+   Copyright (C) 1994-1996,2012  Free Software Foundation, Inc.
 
-   Permission is granted to make and distribute verbatim copies of this
-manual provided the copyright notice and this permission notice are
-preserved on all copies.
+     Permission is granted to copy, distribute and/or modify this
+     document under the terms of the GNU Free Documentation License,
+     Version 1.3 or any later version published by the Free Software
+     Foundation; with no Invariant Sections, with the Front-Cover texts
+     being "A GNU Manual", and with the Back-Cover Texts as in (a)
+     below.  A copy of the license is included in the section entitled
+     "GNU Free Documentation License".
 
-   Permission is granted to copy and distribute modified versions of
-this manual under the conditions for verbatim copying, provided that
-the entire resulting derived work is distributed under the terms of a
-permission notice identical to this one.
-
-   Permission is granted to copy and distribute translations of this
-manual into another language, under the above conditions for modified
-versions, except that this permission notice may be stated in a
-translation approved by John Heidemann.
+     (a) The FSF's Back-Cover Text is: "You have the freedom to copy and
+     modify this GNU manual.  Buying copies from the FSF supports it in
+     developing GNU and promoting software freedom."
 
 
 File: notes-mode.info,  Node: Top,  Next: Introduction,  Prev: (dir),  Up: (dir)
@@ -538,12 +538,13 @@ four-digit year and the two-digit month  of the entries they contain.
 (The format of intermediate directories  is configurable, *Note
 Notes-mode configuration::.)  
 
-   Finally,  each intermediate directory are the notes files themselves,
-named according to the two-digit year, month, and day-of-month.  
+   Finally,  in each intermediate directory are the notes files
+themselves,  named according to the two-digit year, month, and
+day-of-month.  
 
    For the most part,  notes-mode will automatically maintain this
 organization of files,  once you create the top-level directory.
-Notes-mode will also automatically insure  that all files in the notes
+Notes-mode will also automatically ensure  that all files in the notes
 directory are unreadable by  anyone other than their owner.  Notes are
 personal things.  (This behavior is not currently configurable,  but it
 probably should be.)  
@@ -1191,9 +1192,9 @@ This index lists notes-mode concepts.
                                                                (line  6)
 * Notes entries:                         A notes file.         (line 10)
 * Notes file permissions:                The notes directories.
-                                                               (line 45)
+                                                               (line 46)
 * Notes files <1>:                       The notes directories.
-                                                               (line 38)
+                                                               (line 39)
 * Notes files:                           A notes file.         (line  6)
 * Notes files, font matter:              A notes file.         (line 55)
 * Notes index:                           The notes index.      (line  6)
@@ -1217,40 +1218,40 @@ This index lists notes-mode concepts.
 
 
 Tag Table:
-Node: Top1028
-Node: Introduction1953
-Node: What is it?2283
-Ref: What is it?-Footnote-13376
-Node: Why keep notes at all?3432
-Node: Why keep notes on-line?4217
-Ref: Why keep notes on-line?-Footnote-17770
-Ref: Why keep notes on-line?-Footnote-27946
-Ref: Why keep notes on-line?-Footnote-38185
-Node: Why use notes-mode?8284
-Ref: Why use notes-mode?-Footnote-19975
-Node: Y2K Statement10044
-Node: Related work10857
-Node: Staying on top11905
-Node: Basics12555
-Node: Getting started12861
-Node: A notes file14100
-Node: The notes index16843
-Node: The notes directories18095
-Node: Advanced Features19955
-Node: Notes files20215
-Node: Getting around20452
-Node: Subject summary21882
-Node: Encryption22218
-Node: Useful conventions23651
-Node: Notes indices25422
-Node: Notes-mode configuration25898
-Node: History26971
-Node: Notes-mode history27235
-Node: Credits28027
-Node: Changes29908
-Node: Suggested features39761
-Node: Installation40163
-Node: Keystroke index41103
-Node: Concept index42542
+Node: Top1063
+Node: Introduction1988
+Node: What is it?2318
+Ref: What is it?-Footnote-13411
+Node: Why keep notes at all?3467
+Node: Why keep notes on-line?4252
+Ref: Why keep notes on-line?-Footnote-17805
+Ref: Why keep notes on-line?-Footnote-27981
+Ref: Why keep notes on-line?-Footnote-38220
+Node: Why use notes-mode?8319
+Ref: Why use notes-mode?-Footnote-110010
+Node: Y2K Statement10079
+Node: Related work10892
+Node: Staying on top11940
+Node: Basics12590
+Node: Getting started12896
+Node: A notes file14135
+Node: The notes index16878
+Node: The notes directories18130
+Node: Advanced Features19994
+Node: Notes files20254
+Node: Getting around20491
+Node: Subject summary21921
+Node: Encryption22257
+Node: Useful conventions23690
+Node: Notes indices25461
+Node: Notes-mode configuration25937
+Node: History27010
+Node: Notes-mode history27274
+Node: Credits28066
+Node: Changes29947
+Node: Suggested features39800
+Node: Installation40202
+Node: Keystroke index41142
+Node: Concept index42581
 
 End Tag Table

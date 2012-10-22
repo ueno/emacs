@@ -1,34 +1,36 @@
+;;; notes-xemacs.el --- XEmacs compatibility functions
 
-;;;
-;;; notes-xemacs.el
-;;; $Id: notes-xemacs.el,v 1.2 1998/11/04 18:40:27 johnh Exp $
-;;;
-;;; Copyright (C) 1998 by John Heidemann
-;;; Comments to <johnh@isi.edu>.
-;;;
-;;; This file is under the Gnu Public License.
-;;;
+;;; Copyright (C) 1998,2012  Free Software Foundation, Inc.
 
-;;
-;; Xemacs-specific parts of notes-mode.
-;;
+;; Author: <johnh@isi.edu>
+
+;; This file is part of GNU Emacs.
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; GNU Emacs is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;;; Code:
 
 (defun notes-platform-bind-mouse (map generic-key fn)
-  "Map from (FSF) emacs symbols to xemacs for notes-mode.  (Sigh.)"
+  "Map from Emacs symbols to XEmacs for notes-mode (sigh)."
   (let
       ((xemacs-key
 	(cond
 	 ((eq generic-key 'mouse-2) [(button2)])
 	 ((eq generic-key 'S-mouse-2) [(shift button2)]))))
     (define-key map xemacs-key fn)))
-
-
-(defun notes-platform-font-lock ()
-  "Notes platform-specific font-lock mode."
-  (require 'font-lock)
-  (make-local-variable 'font-lock-defaults)
-  (setq font-lock-defaults '(notes-font-lock-keywords nil)))
-
 
 (defun notes-platform-init ()
   "Init platform-specific stuff for notes-mode."
@@ -42,3 +44,4 @@
     ))
 
 (provide 'notes-xemacs)
+;;; notes-xemacs.el ends here

@@ -2,7 +2,7 @@
 
 #
 # notesinit
-# Copyright (C) 1996-2002 by John Heidemann
+# Copyright (C) 1996-2002,2012  Free Software Foundation, Inc.
 # $Id: notesinit,v 1.12 2006/01/14 22:52:56 johnh Exp $
 #
 
@@ -32,7 +32,7 @@ my($PERL) = $^X;  # location of perl executable
 
 
 use POSIX;
-BEGIN { unshift(@INC, "/home/johnh/NOTES/BIN"); };
+BEGIN { unshift(@INC, $ENV{'NOTES_BIN_DIR'}); };
 use NotesVars;
 use strict;
 
@@ -115,7 +115,6 @@ It will take the following steps:
 3. index the default note
 4. set up a crontab entry to re-index notes at 4am every morning
     (by running mkall)
-5. add code to your .emacs file to load notes-mode
 
 END
 ($def_choices, $def) = ('(M/d/s)', 'm');
@@ -147,14 +146,13 @@ dir: $::notes{dir}
 END
 ");
 
-# yuck: the || on the commands is to handle old systems without mkdir -p
 $expl = "\n### 1. creating $::notes{dir}\n";
-commands($expl, "mkdir -p $::notes{dir_notilde} || mkdir $::notes{dir_notilde};\nchmod 0700  $::notes{dir_notilde}\n");
+commands($expl, "mkdir -p $::notes{dir_notilde};\nchmod 0700  $::notes{dir_notilde}\n");
 
 my($heading) = strftime_epoch("%d-%b-%y %A", $now);
 my($underline) = "-" x length($heading);
 $expl = "\n### 2. create a sample note for today ($today_pathname)\n";
-commands($expl, "mkdir `dirname $today_pathname`;\n cat >$today_pathname <<END
+commands($expl, "mkdir -p `dirname $today_pathname`;\n cat >$today_pathname <<END
 
 $heading
 $underline
@@ -191,9 +189,6 @@ crontab -l | sed 's/^\\(.*\\/mkall\\)\$/# \\1/' >>$tmpfile;
 echo '$crontab_entry' >>$tmpfile;
 " . $::notes{bin_dir} . "/setcrontab $tmpfile
 rm -f $tmpfile");
-
-$expl = "\n### 5. add code to your .emacs file to load notes-mode\n";
-commands($expl, "grep notes-variables $home_dir/.emacs >/dev/null || echo \"(require 'notes-variables)\" >>$home_dir/.emacs");
 
 print "\n### changes end here\n" if (!$use_defaults);
 

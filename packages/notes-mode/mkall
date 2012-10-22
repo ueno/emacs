@@ -6,7 +6,7 @@
 # mkall
 # $Id: mkall,v 1.18 2007/02/23 05:14:59 johnh Exp $
 #
-# Copyright (C) 1996 by John Heidemann.
+# Copyright (C) 1996,2012  Free Software Foundation, Inc.
 # Comments to <johnh@isi.edu>.
 #
 # This file is under the Gnu Public License, version 2.
@@ -24,7 +24,7 @@ END
 
 
 require 5.000;
-BEGIN { unshift(@INC, "/home/johnh/NOTES/BIN"); };
+BEGIN { unshift(@INC, $ENV{'NOTES_BIN_DIR'}); };
 use NotesVars;
 use strict;
 use Config;
