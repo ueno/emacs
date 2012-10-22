@@ -4,7 +4,7 @@
 # mkrawindex -- index notes files
 # $Id: mkrawindex,v 1.17 2007/02/24 01:25:08 johnh Exp $
 #
-# Copyright (C) 1994-2006 by John Heidemann.
+# Copyright (C) 1994-2006,2012  Free Software Foundation, Inc.
 # Comments to <johnh@isi.edu>.
 #
 # This file is under the Gnu Public License, version 2.
@@ -32,7 +32,7 @@ END
 #	sed 's:/h/local/users/johnh:~:' >index
 
 require 5.000;
-BEGIN { unshift(@INC, "/home/johnh/NOTES/BIN"); };
+BEGIN { unshift(@INC, $ENV{'NOTES_BIN_DIR'}); };
 use Notes;
 use NotesVars;
 

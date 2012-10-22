@@ -4,7 +4,7 @@
 # NotesVars.pm
 # $Id: NotesVars.pm,v 1.8 2003/05/23 16:26:22 johnh Exp $
 #
-# Copyright (C) 1996 by John Heidemann.
+# Copyright (C) 1996,2012  Free Software Foundation, Inc.
 # Comments to <johnh@isi.edu>.
 #
 # This file is under the Gnu Public License, version 2.
@@ -19,7 +19,7 @@ require 5.000;
 BEGIN {
     no strict 'vars';   # avoid %::notes
     $notes{'home'} = ((getpwuid($<))[7]);
-    my(@config) = `/home/johnh/NOTES/BIN/mkconfig perl`;
+    my(@config) = `"$ENV{'NOTES_BIN_DIR'}/mkconfig" perl`;
     die "$0: mkconfig failed\n" if ($#config == -1);
     eval join("", @config);
     unshift(@INC, $notes{'bin_dir'});

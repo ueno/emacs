@@ -4,7 +4,7 @@
 # NotesIndex.pm
 # $Id: NotesIndex.pm,v 1.3 2003/05/23 16:26:19 johnh Exp $
 #
-# Copyright (C) 1996 by John Heidemann.
+# Copyright (C) 1996,2012  Free Software Foundation, Inc.
 # Comments to <johnh@isi.edu>.
 #
 # This file is under the Gnu Public License, version 2.

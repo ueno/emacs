@@ -1,30 +1,43 @@
+;;; notes-index-mode.el --- Index manipulation for notes-mode
 
-;;;
-;;; notes-index-mode.el
-;;; $Id: notes-index-mode.el,v 1.32 2009/02/04 18:18:45 johnh Exp $
-;;;
-;;; Copyright (C) 1994-1998 by John Heidemann
-;;; Comments to <johnh@isi.edu>.
-;;;
-;;; This file is under the Gnu Public License.
-;;;
+;; Copyright (C) 1994-1998,2012  Free Software Foundation, Inc.
+
+;; Author: <johnh@isi.edu>
+
+;; This file is part of GNU Emacs.
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; GNU Emacs is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;;; Code:
 
 (require 'notes-variables)
 (require 'notes-aux)
 
 
-(defvar notes-index-mode-map nil)
-(if notes-index-mode-map
-    nil
-  (setq notes-index-mode-map (make-sparse-keymap))
-  ;; There were bindings to make mouse-1 do pointer following,
-  ;; but I removed it because all the rest of emacs uses mouse-2.
-  ;; If you want them, add them with notes-index-mode-hook.
-  (notes-platform-bind-mouse notes-index-mode-map 'mouse-2 'notes-index-mouse-follow-link)
-  (notes-platform-bind-mouse notes-index-mode-map 'S-mouse-2 'notes-index-mouse-follow-link-other-window)
-  (define-key notes-index-mode-map "\r" 'notes-index-follow-link)
-  (define-key notes-index-mode-map "o" 'notes-index-link)
-  )
+(defvar notes-index-mode-map
+  (let ((map (make-sparse-keymap)))
+    ;; There were bindings to make mouse-1 do pointer following,
+    ;; but I removed it because all the rest of emacs uses mouse-2.
+    ;; If you want them, add them with notes-index-mode-hook.
+    (notes-platform-bind-mouse map 'mouse-2 'notes-index-mouse-follow-link)
+    (notes-platform-bind-mouse map 'S-mouse-2 'notes-index-mouse-follow-link-other-window)
+    (define-key map "\r" 'notes-index-follow-link)
+    (define-key map "\C-c\C-s" 'notes-summarize-subject)
+    (define-key map "o" 'notes-index-link)
+    map))
 
 
 (defvar notes-index-lazy-message-old-time 0)
@@ -51,20 +64,19 @@ This routine works by calling either \[notes-index-parse-buffer-uncached]
 or \[notes-index-parse-buffer-cached] (if possible)."
   (interactive)
   (let
-      ((old-buffer-read-only buffer-read-only))
-    (setq buffer-read-only nil)
-    (if (and (file-exists-p (concat notes-dir "/index_cache.el"))
-	     (file-newer-than-file-p (concat notes-dir "/index_cache.el")
-				     (concat notes-dir "/index")))
+      ((inhibit-read-only t))
+    (if (and (file-exists-p (expand-file-name "index_cache.el" notes-dir))
+	     (file-newer-than-file-p
+              (expand-file-name "index_cache.el" notes-dir)
+              (expand-file-name "index" notes-dir)))
 	(progn
-	  (load (concat notes-dir "/index_cache"))
+	  (load (expand-file-name "index_cache" notes-dir))
 	  (notes-index-parse-buffer-cached))
       ;; cache miss
       (message "notes-index-parse-buffer: cache is not present or is not up-to-date")
       (notes-index-parse-buffer-uncached))
     ;; clean some things up
     (message "")
-    (setq buffer-read-only old-buffer-read-only)
     (set-buffer-modified-p nil)))
 
 (defun notes-index-parse-buffer-uncached ()
@@ -82,6 +94,7 @@ Tenses passive will be."
 	  end subject)
       ;; prepare the way
       (if notes-use-font-lock
+          ;; FIXME: That's quite drastic!  What is this trying to do?
 	  (set-text-properties (point-min) (point-max) nil))
       ;; There used to be problem that we used a fixed obarray length,
       ;; creating a lot of hash collisions.  Now we dynamically compute it
@@ -143,9 +156,7 @@ Returns the buffer position of a successful hit, or nil."
   (let (stop)
     (while (and (not stop)
 		(funcall iter-proc end))
-      (if (funcall done-proc
-		   (buffer-substring (match-beginning 0) (match-end 0))
-		   done-arg)
+      (if (funcall done-proc (match-string 0) done-arg)
 	  (setq stop (goto-char (match-beginning 0)))))
     stop))
 
@@ -159,19 +170,19 @@ to DIRECTION (and the next one if DIRECTION is 'this)."
   (cond
    ((eq direction 'prev)
     (notes-index-date-search
-     (get-end-of-line) (get-beginning-of-line)
+     (line-end-position) (line-beginning-position)
      (function (lambda (end) (re-search-backward notes-file-regexp end t)))
      (function (lambda (trial target) (string-lessp trial target)))
      date))
    ((eq direction 'next)
     (notes-index-date-search
-     (get-beginning-of-line) (get-end-of-line)
+     (line-beginning-position) (line-end-position)
      (function (lambda (end) (re-search-forward notes-file-regexp end t)))
      (function (lambda (trial target) (string-lessp target trial)))
      date))
    (t
     (notes-index-date-search
-     (get-beginning-of-line) (get-end-of-line)
+     (line-beginning-position) (line-end-position)
      (function (lambda (end) (re-search-forward notes-file-regexp end t)))
      (function (lambda (trial target) (string-equal trial target)))
      date))))
@@ -201,12 +212,12 @@ and the new information is shown WHERE (either 'otherwindow or not)."
       (setq start (point))
       (if (not (re-search-forward notes-file-regexp (+ (point) 6) t))
 	  (error "Not on notes-index-mode link."))
-      (setq date (buffer-substring (match-beginning 0) (match-end 0)))
+      (setq date (match-string 0))
       ;; pick out the tag
       (beginning-of-line)
       (if (not (re-search-forward "^\\([^:]*\\):" start t))
 	  (error "Not on notes-index-mode link line."))
-      (setq tag (buffer-substring (match-beginning 1) (match-end 1)))
+      (setq tag (match-string 1))
       ;; make and process the url
       (notes-index-link date tag where))))
 
@@ -226,12 +237,12 @@ and the new information is shown WHERE (either 'otherwindow or not)."
   "Extract the notes-index subject for the current line."
   (save-excursion
     (beginning-of-line)
-    (if (re-search-forward "^\\(.*\\): " (get-end-of-line) t)
-	(buffer-substring (match-beginning 1) (match-end 1))
+    (if (re-search-forward "^\\(.*\\): " (line-end-position) t)
+	(match-string 1)
       nil)))
 
 ;;;###autoload
-(defun notes-index-mode ()
+(define-derived-mode notes-index-mode special-mode "Notes-index"
   "Notes-index-mode with mouse support.
 
 You may wish to change notes-bold-face and notes-use-font-lock.
@@ -242,24 +253,17 @@ which invokes notes-index-mode.
 
 Key bindings are:
 \\{notes-index-mode-map}"
-  (interactive)
-
   (notes-platform-init)
 
-  (setq buffer-read-only nil)
   (notes-index-parse-buffer)
-  (setq major-mode 'notes-index-mode
-	mode-name "Notes-index")
-  (use-local-map notes-index-mode-map)
-  (define-key notes-index-mode-map "\C-c\C-s" 'notes-summarize-subject)
 
-  (if notes-use-font-lock
-      (notes-platform-font-lock notes-index-font-lock-keywords))
+  (set (make-local-variable 'font-lock-defaults)
+       '(notes-index-font-lock-keywords
+         t nil nil beginning-of-line))
 
-  (run-mode-hooks 'notes-index-mode-hooks)
   ;; No editing is allowed.
   (setq buffer-read-only t)
 )
 
-(put 'notes-index-mode 'mode-class 'special)
 (provide 'notes-index-mode)
+;;; notes-index-mode.el ends here

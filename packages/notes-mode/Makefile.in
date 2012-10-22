@@ -44,16 +44,9 @@ OTHERS = \
 	configure \
 	configure.in \
 	install-sh \
-	strftime.c \
 	notes-mode.texi \
 	notes-mode.info \
 	notes-mode.ps.gz
-
-#SRCS = \
-#	strftime.c
-
-#BINS = \
-#	strftime
 
 SCRIPTS = \
 	mkall mkindex mkprevnext mkrawindex mkindexcache \
@@ -64,7 +57,6 @@ ELS = \
 	notes-variables.el \
 	notes-mode.el notes-index-mode.el \
 	notes-url.el notes-aux.el \
-	notes-bootstrap.el \
 	notes-emacs.el notes-xemacs.el \
 	notes-first.el
 
@@ -78,11 +70,6 @@ MY_EL_DIR=/home/johnh/LIB/EMACS
 #
 # Compliation stuff.
 #
-
-# all: strftime
-# all: strftime
-
-# strftime: strftime.c
 
 all:
 	@echo "nothing required for make; just run \"make install\""

@@ -1,24 +1,37 @@
+;;; notes-url.el --- Simplified url management routines for notes-mode
 
-;;;
-;;; notes-url.el
-;;; simplified url management routines for notes-mode
-;;; $Id: notes-url.el,v 1.29 2005/02/20 22:53:44 johnh Exp $
-;;;
-;;; Copyright (C) 1994-1998 by John Heidemann
-;;; Comments to <johnh@isi.edu>.
-;;;
-;;; This file is under the Gnu Public License.
-;;;
-;;; This code was originallly cribbed from w3.el
-;;; by William M. Perry <wmperry@indiana.edu>,
-;;; but has since been completely rewritten.
-;;;
-;;; Why don't I just call his code?  Because to use
-;;; w3-follow-link I need to pull in at least 150k of w3.el
-;;; and 150k of url.el, all just to open a file on the local
-;;; computer.  Instead I've hacked his code down to the 3k
-;;; needed for opening local files.
-;;;
+;;; Copyright (C) 1994-1998,2012  Free Software Foundation, Inc.
+
+;; Author: <johnh@isi.edu>
+
+;; This file is part of GNU Emacs.
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; GNU Emacs is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; This code was originallly cribbed from w3.el
+;; by William M. Perry <wmperry@indiana.edu>,
+;; but has since been completely rewritten.
+;;
+;; Why don't I just call his code?  Because to use
+;; w3-follow-link I need to pull in at least 150k of w3.el
+;; and 150k of url.el, all just to open a file on the local
+;; computer.  Instead I've hacked his code down to the 3k
+;; needed for opening local files.
+
+;;; Code:
 
 (require 'notes-variables)
 (require 'notes-aux)
@@ -43,30 +56,30 @@ Other URLs it hands off to the routine in notes-w3-alternate-url
 for processing.  If you use w3-mode, then
     (setq notes-w3-alternate-url 'w3-follow-link)
 will have w3 handle tough URLs."
-  (if (string-match "^[Uu][Rr][Ll]:" url)
+  (if (string-match "\\`[Uu][Rr][Ll]:" url)
       (setq url (substring url 4)))
-  (if (not (string-match "^file://\\(localhost\\)?/\\(.*\\)$" url))
+  (if (not (string-match "\\`file://\\(localhost\\)?/\\(.*\\)\\'" url))
       (if (string-match "none" url)
 	  (error "Notes-mode can't follow URL <none>.")
 	(funcall notes-w3-alternate-url url where)) ;; now, with where! (emacs-20.4)
-    (let ((filetag (match-substring url 2))
+    (let ((filetag (match-string 2 url))
 	  fname tag count count-string)
       ;; pick out the tag, if any
-      (if (string-match "^\\([^#]*\\)#\\([0-9]*\\)\\(.*\\)$" filetag)
-	  (setq fname (match-substring filetag 1)
-		count-string (match-substring filetag 2 nil t)
-		count (if count-string (string-to-int count-string) 1)
-		tag (match-substring filetag 3))
+      (if (string-match "\\`\\([^#]*\\)#\\([0-9]+\\)?\\(.*\\)\\'" filetag)
+	  (setq fname (match-string 1 filetag)
+		count-string (match-string 2 filetag)
+		count (if count-string (string-to-number count-string) 1)
+		tag (match-string 3 filetag))
 	(setq fname filetag
 	      count 1
 	      tag nil))
       ;; Hack---url's refering to notes-index files have different tags.
       ;; Otherwise notes-goto-index-entry fails on subjects like "* 252A".
-      (if (and count-string tag (string-match "/index$" fname))
+      (if (and count-string tag (string-match "/index\\'" fname))
 	  (setq tag (concat count-string tag)
 		count-string "1"
 		count 1))
-      (if (not (string-match "^~" fname))   ; non-~ fnames start at fs root
+      (if (not (string-match "\\`~" fname))   ; non-~ fnames start at fs root
 	  (setq fname (concat "/" fname)))
       ;; open the file
       (cond
@@ -82,8 +95,7 @@ will have w3 handle tough URLs."
   (let ((result)
 	(separators " /\t.:")
 	(buf (get-buffer-create " *notes-w3-url-tag-backup")))
-    (save-excursion
-      (set-buffer buf)
+    (with-current-buffer buf
       (erase-buffer)
       (insert tag)
       (goto-char (point-max))
@@ -154,7 +166,7 @@ entries."
 	  (skip-chars-forward "<A-Za-z:"))
       ;; First look backwards to whitespace or beginning of line
       ;; followed by a url header "asdf:".
-      (if (re-search-backward "[ \t\n][^ \t\n]+:" (get-beginning-of-line) 1)
+      (if (re-search-backward "[ \t\n][^ \t\n]+:" (line-beginning-position) 1)
 	  (forward-char 1)          ; whitespace bound
 	(setq quote-regexp "\n"))   ; eoln bound
       ;; Handle the common case of next/prev pointers.
@@ -162,7 +174,7 @@ entries."
       ;; follows.  (This hack is to support a guy who doesn't use
       ;; the mouse and so looks up urls at the beginning of the line.)
       (if (looking-at "\\(prev\\|next\\):")
-	  (skip-chars-forward "^<" (get-end-of-line)))
+	  (skip-chars-forward "^<" (line-end-position)))
       ;; Check for a quoting character.
       (cond
        ((equal (char-after (point)) ?<)
@@ -176,7 +188,7 @@ entries."
       ;; Remember start of url.
       (setq start (point))
       ;; Search for end of url.
-      (if (re-search-forward quote-regexp (get-end-of-line) 1)
+      (if (re-search-forward quote-regexp (line-end-position) 1)
 	  (forward-char -1))
       (setq end (point))
       ;; Interpret it (outside the save-excursion so we can go
@@ -194,6 +206,5 @@ entries."
 			    'otherwindow
 			  nil)))
 
-
-
-
+(provide 'notes-url)
+;;; notes-url.el ends here

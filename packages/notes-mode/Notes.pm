@@ -4,7 +4,7 @@
 # Notes.pm
 # $Id: Notes.pm,v 1.9 2010/06/20 18:31:22 johnh Exp $
 #
-# Copyright (C) 1996-2006 by John Heidemann.
+# Copyright (C) 1996-2006,2012  Free Software Foundation, Inc.
 # Comments to <johnh@isi.edu>.
 #
 # This file is under the Gnu Public License, version 2.
