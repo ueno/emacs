@@ -126,7 +126,7 @@ Set by customizing `csv-separators' -- do not set directly!")
   "Regexp to match a field separator.
 Set by customizing `csv-separators' -- do not set directly!")
 
-(defvar csv-skip-regexp nil
+(defvar csv--skip-regexp nil
   "Regexp used by `skip-chars-forward' etc. to skip fields.
 Set by customizing `csv-separators' -- do not set directly!")
 
@@ -154,7 +154,7 @@ All must be different from the field quote characters, `csv-field-quotes'."
 	       value)
 	 (custom-set-default variable value)
 	 (setq csv-separator-chars (mapcar 'string-to-char value)
-	       csv-skip-regexp (apply 'concat "^\n" csv-separators)
+	       csv--skip-regexp (apply 'concat "^\n" csv-separators)
 	       csv-separator-regexp (apply 'concat `("[" ,@value "]"))
 	       csv-font-lock-keywords
 	       ;; NB: csv-separator-face variable evaluates to itself.
@@ -597,7 +597,7 @@ BEG and END specify the region to sort."
   (barf-if-buffer-read-only)
   (csv-sort-fields-1 field beg end
 		     (lambda () (csv-sort-skip-fields field) nil)
-		     (lambda () (skip-chars-forward csv-skip-regexp))))
+		     (lambda () (skip-chars-forward csv--skip-regexp))))
 
 (defun csv-sort-numeric-fields (field beg end)
   "Sort lines in region numerically by the ARGth field of each line.
@@ -651,17 +651,17 @@ point or marker arguments, BEG and END, delimiting the region."
 
 (defsubst csv-end-of-field ()
   "Skip forward over one field."
-  (skip-syntax-forward " ")
+  (skip-chars-forward " ")
   (if (eq (char-syntax (following-char)) ?\")
       (goto-char (scan-sexps (point) 1)))
-  (skip-chars-forward csv-skip-regexp))
+  (skip-chars-forward csv--skip-regexp))
 
 (defsubst csv-beginning-of-field ()
   "Skip backward over one field."
   (skip-syntax-backward " ")
   (if (eq (char-syntax (preceding-char)) ?\")
       (goto-char (scan-sexps (point) -1)))
-  (skip-chars-backward csv-skip-regexp))
+  (skip-chars-backward csv--skip-regexp))
 
 (defun csv-forward-field (arg)
   "Move forward across one field, cf. `forward-sexp'.
