@@ -4,7 +4,7 @@
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: convenience
-;; Version: 1.0
+;; Version: 1.1
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -44,11 +44,14 @@ Linum mode is a buffer-local minor mode."
   :lighter nil ;; (" NLinum" nlinum--desc)
   (jit-lock-unregister #'nlinum--region)
   (remove-hook 'window-configuration-change-hook #'nlinum--setup-window t)
+  (remove-hook 'after-change-functions #'nlinum--after-change)
+  (kill-local-variable 'nlinum--line-number-cache)
   (remove-overlays (point-min) (point-max) 'nlinum t)
   ;; (kill-local-variable 'nlinum--ol-counter)
   (kill-local-variable 'nlinum--width)
   (when nlinum-mode
     (add-hook 'window-configuration-change-hook #'nlinum--setup-window nil t)
+    (add-hook 'after-change-functions #'nlinum--after-change nil t)
     (jit-lock-register #'nlinum--region t))
   (nlinum--setup-windows))
 
@@ -118,6 +121,28 @@ Linum mode is a buffer-local minor mode."
 ;;                  (- debug-count debug-new-count) debug-new-count)))))
 
 
+(defvar nlinum--line-number-cache nil)
+(make-variable-buffer-local 'nlinum--line-number-cache)
+
+(defun nlinum--after-change (&rest _args)
+  (setq nlinum--line-number-cache nil))
+
+(defun nlinum--line-number-at-pos ()
+  "Like `line-number-at-pos' but sped up with a cache."
+  ;; (assert (bolp))
+  (let ((pos
+         (if (and nlinum--line-number-cache
+                  (> (- (point) (point-min))
+                     (abs (- (point) (car nlinum--line-number-cache)))))
+             (funcall (if (> (point) (car nlinum--line-number-cache))
+                          #'+ #'-)
+                      (cdr nlinum--line-number-cache)
+                      (count-lines (point) (car nlinum--line-number-cache)))
+           (line-number-at-pos))))
+    ;;(assert (= pos (line-number-at-pos)))
+    (setq nlinum--line-number-cache (cons (point) pos))
+    pos))
+
 (defun nlinum--region (start limit)
   (save-excursion
     ;; Text may contain those nasty intangible properties, but
@@ -126,7 +151,7 @@ Linum mode is a buffer-local minor mode."
       (goto-char start)
       (unless (bolp) (forward-line 1))
       (remove-overlays (point) limit 'nlinum t)
-      (let ((line (line-number-at-pos))
+      (let ((line (nlinum--line-number-at-pos))
             (fmt (format "%%%dd" nlinum--width)))
         (while
             (and (not (eobp)) (< (point) limit)
