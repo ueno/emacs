@@ -362,7 +362,7 @@ Example:
       (setq key (substring (symbol-name kw) 1))
       (case kw
 	((:package)
-	 ;; Value shall be one word.
+	 ;; Value shall be one word.  Extract email address, if existing.
 	 (if (string-match "\\`\\S-+\\'" val)
 	     (progn
 	       (when (string-equal "me" val)
@@ -372,7 +372,7 @@ Example:
 	       (add-to-list 'user val))
 	   (error "Wrong %s: %s" key val)))
 	((:tag)
-	 ;; Value shall be one word.  Extract email address, if existing.
+	 ;; Value shall be one word.
 	 (if (string-match "\\`\\S-+\\'" val)
 	     (add-to-list 'tags val)
 	   (error "Wrong %s: %s" key val)))

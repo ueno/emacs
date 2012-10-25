@@ -34,6 +34,7 @@
 ;;
 ;;   (autoload 'debbugs-gnu "debbugs-gnu" "" 'interactive)
 ;;   (autoload 'debbugs-gnu-search "debbugs-gnu" "" 'interactive)
+;;   (autoload 'debbugs-gnu-usertags "debbugs-gnu" "" 'interactive)
 
 ;; The bug tracker is called interactively by
 ;;
@@ -107,6 +108,22 @@
 ;; per column by selecting a column with the mouse.  The sorting
 ;; happens as expected for the respective column; sorting in the Title
 ;; column is depending on whether you are the owner of a bug.
+
+;; Another approach for listing bugs is calling the command
+;;
+;;   M-x debbugs-gnu-usertags
+
+;; This command shows you all existing user tags for the packages
+;; defined in `debbugs-gnu-default-packages'.  A prefix for the
+;; command allows you to use other packe names, or an arbitrary string
+;; for a user who has tagged bugs.  The command returns the list of
+;; existing user tags for the given user(s) or package name(s),
+;; respectively.  Applying RET on a user tag, all bugs tagged with
+;; this user tag are shown.
+
+;; Unfortunately, it is not possible with the SOAP interface to show
+;; all users who have tagged bugs.  This list can be retrieved via
+;; <http://debbugs.gnu.org/cgi/pkgindex.cgi?indexon=users>.
 
 ;;; Code:
 
@@ -1112,6 +1129,82 @@ removed instead."
 			id (if reverse " -" "")
 			message))))
       (funcall send-mail-function))))
+
+(defvar debbugs-gnu-usertags-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map tabulated-list-mode-map)
+    (define-key map "\r" 'debbugs-gnu-select-usertag)
+    (define-key map [mouse-1] 'debbugs-gnu-select-usertag)
+    (define-key map [mouse-2] 'debbugs-gnu-select-usertag)
+    map))
+
+(define-derived-mode debbugs-gnu-usertags-mode tabulated-list-mode "Usertags"
+  "Major mode for listing user tags.
+
+All normal editing commands are switched off.
+\\<debbugs-gnu-usertags-mode-map>
+
+The following commands are available:
+
+\\{debbugs-gnu-usertags-mode-map}"
+  (buffer-disable-undo)
+  (setq truncate-lines t)
+  (setq buffer-read-only t))
+
+;;;###autoload
+(defun debbugs-gnu-usertags (&optional packages)
+  "List all outstanding Emacs bugs."
+  (interactive
+   (list
+    (if current-prefix-arg
+	(completing-read-multiple
+	 "Package name(s) or email address: "
+	 (append debbugs-gnu-all-packages (list user-mail-address)) nil nil
+	 (mapconcat 'identity debbugs-gnu-default-packages ","))
+      debbugs-gnu-default-packages)))
+
+  (unwind-protect
+      (let ((inhibit-read-only t)
+	    (debbugs-port "gnu.org")
+	    (buffer-name "*Emacs User Tags*")
+	    (user-tab-length
+	     (1+ (apply 'max (length "User") (mapcar 'length packages)))))
+
+	;; Create buffer.
+	(when (get-buffer buffer-name)
+	  (kill-buffer buffer-name))
+	(pop-to-buffer (get-buffer-create buffer-name))
+	(debbugs-gnu-usertags-mode)
+	(setq tabulated-list-format `[("User" ,user-tab-length t)
+				      ("Tag"  10 t)])
+	(setq tabulated-list-sort-key (cons "User" nil))
+	;(setq tabulated-list-printer 'debbugs-gnu-print-entry)
+	(erase-buffer)
+
+	;; Retrieve user tags.
+	(dolist (package packages)
+	  (dolist (tag (debbugs-get-usertag :package package))
+	    (add-to-list
+	     'tabulated-list-entries
+	     ;; `tabulated-list-id' is the parameter list for `debbugs-gnu'.
+	     `((("tagged") (,package) nil nil (,tag))
+	       ,(vector (propertize package 'mouse-face widget-mouse-face)
+			(propertize tag 'mouse-face widget-mouse-face)))
+	     'append)))
+
+	;; Show them.
+	(tabulated-list-init-header)
+	(tabulated-list-print)
+
+	(set-buffer-modified-p nil)
+	(goto-char (point-min)))))
+
+(defun debbugs-gnu-select-usertag ()
+  "Select the user tag on the current line."
+  (interactive)
+  ;; We open the bug reports.
+  (let ((args (get-text-property (line-beginning-position) 'tabulated-list-id)))
+    (when args (apply 'debbugs-gnu args))))
 
 (provide 'debbugs-gnu)
 
