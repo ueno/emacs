@@ -1170,6 +1170,13 @@ The following commands are available:
 	    (user-tab-length
 	     (1+ (apply 'max (length "User") (mapcar 'length packages)))))
 
+	;; Initialize variables.
+	(when (and (file-exists-p debbugs-gnu-persistency-file)
+		   (not debbugs-gnu-local-tags))
+	  (with-temp-buffer
+	    (insert-file-contents debbugs-gnu-persistency-file)
+	    (eval (read (current-buffer)))))
+
 	;; Create buffer.
 	(when (get-buffer buffer-name)
 	  (kill-buffer buffer-name))
@@ -1183,7 +1190,7 @@ The following commands are available:
 
 	;; Retrieve user tags.
 	(dolist (package packages)
-	  (dolist (tag (debbugs-get-usertag :package package))
+	  (dolist (tag (sort (debbugs-get-usertag :package package) 'string<))
 	    (add-to-list
 	     'tabulated-list-entries
 	     ;; `tabulated-list-id' is the parameter list for `debbugs-gnu'.
@@ -1191,6 +1198,14 @@ The following commands are available:
 	       ,(vector (propertize package 'mouse-face widget-mouse-face)
 			(propertize tag 'mouse-face widget-mouse-face)))
 	     'append)))
+
+	;; Add local tags.
+	(when debbugs-gnu-local-tags
+	  (add-to-list
+	     'tabulated-list-entries
+	     `((("tagged"))
+	       ,(vector "" (propertize "(local tags)"
+				       'mouse-face widget-mouse-face)))))
 
 	;; Show them.
 	(tabulated-list-init-header)
