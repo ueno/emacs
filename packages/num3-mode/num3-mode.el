@@ -145,6 +145,5 @@ non-nil.  The region the face is set to is from LO to HI."
   (font-lock-append-text-property lo hi 'face
                                   (if even 'num3-face-even 'num3-face-odd)))
 
-(provide 'num3)
-
-;;; num3.el ends here
+(provide 'num3-mode)
+;;; num3-mode.el ends here
