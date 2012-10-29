@@ -545,7 +545,9 @@ marked as \"client-side filter\"."
 	(lambda (x) (cdr (assoc "id" x)))
 	(apply 'debbugs-search-est args)))
       ;; User tags.
-      (tags (apply 'debbugs-get-usertag args))
+      (tags
+       (setq args (mapcar (lambda (x) (if (eq x :package) :user x)) args))
+       (apply 'debbugs-get-usertag args))
       ;; Otherwise, we retrieve the bugs from the server.
       (t (apply 'debbugs-get-bugs args)))
      ;; Sort function.
@@ -1152,7 +1154,7 @@ The following commands are available:
   (setq buffer-read-only t))
 
 ;;;###autoload
-(defun debbugs-gnu-usertags (&optional packages)
+(defun debbugs-gnu-usertags (&optional users)
   "List all outstanding Emacs bugs."
   (interactive
    (list
@@ -1168,7 +1170,7 @@ The following commands are available:
 	    (debbugs-port "gnu.org")
 	    (buffer-name "*Emacs User Tags*")
 	    (user-tab-length
-	     (1+ (apply 'max (length "User") (mapcar 'length packages)))))
+	     (1+ (apply 'max (length "User") (mapcar 'length users)))))
 
 	;; Initialize variables.
 	(when (and (file-exists-p debbugs-gnu-persistency-file)
@@ -1189,13 +1191,13 @@ The following commands are available:
 	(erase-buffer)
 
 	;; Retrieve user tags.
-	(dolist (package packages)
-	  (dolist (tag (sort (debbugs-get-usertag :package package) 'string<))
+	(dolist (user users)
+	  (dolist (tag (sort (debbugs-get-usertag :user user) 'string<))
 	    (add-to-list
 	     'tabulated-list-entries
 	     ;; `tabulated-list-id' is the parameter list for `debbugs-gnu'.
-	     `((("tagged") (,package) nil nil (,tag))
-	       ,(vector (propertize package 'mouse-face widget-mouse-face)
+	     `((("tagged") (,user) nil nil (,tag))
+	       ,(vector (propertize user 'mouse-face widget-mouse-face)
 			(propertize tag 'mouse-face widget-mouse-face)))
 	     'append)))
 

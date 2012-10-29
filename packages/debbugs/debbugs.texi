@@ -71,6 +71,7 @@ without addressing Debbugs' web interface.
 * Requesting bug numbers::      How to request bug report numbers.
 * Requesting bugs statuses::    How to request the status of bug reports.
 * Requesting messages::         How to get messages from bug reports.
+* Requesting user tags::        How to request tags set by users.
 @end menu
 
 @node Installation
@@ -505,6 +506,57 @@ inserted into the current buffer.
 Note, that mbox downloading will work only if the
 @code{:bugreport-url} field of the @code{debbugs-servers} variable is
 specified (@pxref{Configuration}).
+@end defun
+
+@node Requesting user tags
+@chapter Requesting user tags
+
+A user tag is a string, a user has assigned to one or several bugs.
+The user is identified by an email address.  The port @code{"gnu.org"}
+uses also package names as user identification.
+
+@defun debbugs-get-usertag &rest query
+Return a list of bug numbers which match @var{query}.
+
+@var{query} is a sequence of keyword-value pairs where the values are
+strings, i.e. :KEYWORD ``VALUE'' [:KEYWORD ``VALUE'']*
+
+Valid keywords are:
+
+@table @code
+@item :user
+The value is the name of the package a bug belongs to, like
+@code{"emacs"}, @code{"coreutils"}, or @code{"tramp"}.  It can also be
+an email address of a user who has applied a user tag.  The special
+email address @code{"me"} is used as pattern, replaced with
+@code{user-mail-address}.  There must be at least one such entry; it
+is recommended to have exactly one.
+
+@item :tag
+A string applied as user tag.  Often, it is a subproduct
+identification, like @code{"cedet"} or @code{"tramp"} for the package
+@code{"emacs"}.
+@end table
+
+If there is no @code{:tag} entry, no bug numbers will be returned but
+a list of existing user tags for @code{:user}.
+
+Example.  Get all user tags for the package @code{"emacs"}:
+
+@example
+(let ((debbugs-port "gnu.org"))
+  (debbugs-get-usertag :user "emacs"))
+@result{} ("www" "solaris" "ls-lisp" "cygwin")
+@end example
+
+Get all bugs tagged by package @code{"emacs"} with @code{"www"} or
+@code{"cygwin"})):
+
+@example
+(let ((debbugs-port "gnu.org"))
+  (debbugs-get-usertag :user "emacs" :tag "www" :tag "cygwin"))
+@result{} (807 1223 5637)
+@end example
 @end defun
 
 @bye
