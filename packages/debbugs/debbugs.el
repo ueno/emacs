@@ -328,27 +328,27 @@ strings, i.e. :KEYWORD \"VALUE\" [:KEYWORD \"VALUE\"]*
 
 Valid keywords are:
 
-  :package -- The value is the name of the package a bug belongs
-  to, like \"emacs\", \"coreutils\", \"gnus\", or \"tramp\".  It
-  can also be an email address of a user who has applied a user
-  tag.  The special email address \"me\" is used as pattern,
-  replaced with `user-mail-address'.  There must be at least one
-  such entry; it is recommended to have exactly one.
+  :user -- The value is the name of the package a bug belongs to,
+  like \"emacs\", \"coreutils\", \"gnus\", or \"tramp\".  It can
+  also be an email address of a user who has applied a user tag.
+  The special email address \"me\" is used as pattern, replaced
+  with `user-mail-address'.  There must be at least one such
+  entry; it is recommended to have exactly one.
 
   :tag -- A string applied as user tag.  Often, it is a
   subproduct identification, like \"cedet\" or \"tramp\" for the
   package \"emacs\".
 
 If there is no :tag entry, no bug numbers will be returned but a list of
-existing user tags for :package.
+existing user tags for :user.
 
 Example:
 
-  \(debbugs-get-usertag :package \"emacs\")
+  \(debbugs-get-usertag :user \"emacs\")
 
   => (\"www\" \"solaris\" \"ls-lisp\" \"cygwin\")
 
-  \(debbugs-get-usertag :package \"emacs\" :tag \"www\" :tag \"cygwin\")
+  \(debbugs-get-usertag :user \"emacs\" :tag \"www\" :tag \"cygwin\")
 
   => (807 1223 5637)"
 
@@ -361,7 +361,7 @@ Example:
 	(error "Wrong query: %s %s" kw val))
       (setq key (substring (symbol-name kw) 1))
       (case kw
-	((:package)
+	((:user)
 	 ;; Value shall be one word.  Extract email address, if existing.
 	 (if (string-match "\\`\\S-+\\'" val)
 	     (progn
@@ -381,7 +381,7 @@ Example:
     (unless (null query)
       (error "Unknown key: %s" (car query)))
     (unless (= (length user) 1)
-      (error "There must be exactly one :package entry"))
+      (error "There must be exactly one :user entry"))
 
     (setq
      object
