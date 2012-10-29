@@ -132,8 +132,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>. -->
   </wsdl:message>
 
   <wsdl:message name="search_estRequest">
-    <wsdl:part name="query" type="types:ArrayOfArrayOfAnyType"
-	       minOccurs="1" maxOccurs="unbounded"/>
+    <wsdl:part name="query" type="types:ArrayOfArrayOfAnyType"/>
   </wsdl:message>
   <wsdl:message name="search_estResponse">
     <wsdl:part name="soapenc:Array" type="types:ArrayOfArrayOfArrayOfAnyType"/>
