@@ -1,7 +1,6 @@
 ;;; all.el --- Edit all lines matching a given regexp
 
-;; Copyright (C) 1985-1987, 1992, 1994, 2011 Free Software Foundation, Inc.
-;; Copyright (C) 1994 Per Abrahamsen
+;; Copyright (C) 1985-1987,1992,1994,2011-2012 Free Software Foundation, Inc.
 
 ;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
 ;; Version: 1.0

@@ -1,7 +1,6 @@
 ;;; epoch-view.el --- Minor mode to visualize epoch timestamps
 
-;; Copyright (C) 2010
-;;   Free Software Foundation, Inc.
+;; Copyright (C) 2010, 2012  Free Software Foundation, Inc.
 
 ;; Author: Ted Zlatanov <tzz@lifelogs.com>
 ;; Keywords: data, timestamp, epoch, unix
