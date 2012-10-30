@@ -25,7 +25,7 @@ archive: archive-tmp
 
 archive-tmp: packages
 	mkdir -p $(ARCHIVE_TMP)
-	cp -r packages $(ARCHIVE_TMP)
+	cp -r packages/. $(ARCHIVE_TMP)/packages
 
 process-archive:
 	cd $(ARCHIVE_TMP)/packages; $(EMACS) -batch -l $(CURDIR)/admin/archive-contents.el -f batch-make-archive
@@ -47,13 +47,13 @@ process-archive:
 ## admin scripts:
 archive-full: archive-tmp org-fetch
 	$(MAKE) $(MFLAGS) process-archive
-	mkdir -p archive/admin
-	cp admin/* archive/admin/
+	#mkdir -p archive/admin
+	#cp admin/* archive/admin/
 
 org-fetch: archive-tmp
-	cd archive-tmp/packages; \
-	pkgname=`curl -s http://orgmode.org/elpa/|perl -ne 'push @f, $1 if m/(org-\d{8})\.tar/; END { @f = sort @f; print "$f[-1]\n"}'`; \
-	wget -q http://orgmode.org/elpa/${pkgname}.tar -O ${pkgname}.tar; \
+	cd $(ARCHIVE_TMP)/packages; \
+	pkgname=`curl -s http://orgmode.org/elpa/|perl -ne 'push @f, $$1 if m/(org-\d{8})\.tar/; END { @f = sort @f; print "$$f[-1]\n"}'`; \
+	wget -q http://orgmode.org/elpa/$${pkgname}.tar -O $${pkgname}.tar; \
 	if [ -f $${pkgname}.tar ]; then \
 		tar xf $${pkgname}.tar; \
 		rm -f $${pkgname}.tar; \
