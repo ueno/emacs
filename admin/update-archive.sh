@@ -32,16 +32,16 @@ signal_error () {
     else
         set -- $(host -t mx gnu.org);
         mx_gnu_org="$4"
-        (cat <<ENDDOC
-HELO elpa.gnu.org
-MAIL FROM: <elpa@elpa.gnu.org>
-RCPT TO: <emacs-elpa-diffs@gnu.org>
-DATA
+        (sleep 5; echo "HELO elpa.gnu.org"
+         sleep 1; echo "MAIL FROM: <elpa@elpa.gnu.org>"
+         sleep 1; echo "RCPT TO: <emacs-elpa-diffs@gnu.org>"
+         sleep 1; echo "DATA"
+         sleep 1; cat <<ENDDOC
 From: ELPA update <elpa@elpa.gnu.org>
 To: emacs-elpa-diffs@gnu.org
+Subject: $title
+
 ENDDOC
-         echo "Subject: $title"
-         echo
          cat -
          echo ".") | telnet "$mx_gnu_org" smtp
     fi
