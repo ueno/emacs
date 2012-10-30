@@ -1,6 +1,6 @@
 ;;; gen-confusables.el --- generate uni-confusables.el from confusables.txt
 
-;; Copyright (C) 2011  Teodor Zlatanov
+;; Copyright (C) 2011, 2012  Free Software Foundation, Inc.
 
 ;; Author: Teodor Zlatanov <tzz@lifelogs.com>
 
