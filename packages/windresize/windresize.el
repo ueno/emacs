@@ -30,7 +30,7 @@
 ;; This mode lets you edit the window configuration interactively just
 ;; by using the keyboard.
 ;;
-;; To use it, type M-x windresize; this enters put Emacs in a state
+;; To use it, type M-x windresize; this puts Emacs in a state
 ;; where the up/down and left/right arrow keys resize the window
 ;; dimensions.  To return Emacs to its ordinary state, type RET.
 ;;
@@ -868,7 +868,7 @@ horizontally and vertically."
 (defun windresize-cancel-and-quit ()
   "Cancel window resizing and quit `windresize'."
   (interactive)
-  (if (eq major-mode 'help-mode)
+  (if (derived-mode-p 'help-mode)
       (progn (View-quit)
 	     (setq windresize-msg '("Help quit" . 2)))
     (switch-to-buffer windresize-buffer)
