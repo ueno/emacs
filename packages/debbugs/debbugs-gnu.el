@@ -5,7 +5,7 @@
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: comm, hypermedia, maint
 ;; Package: debbugs
-;; Version: 0.3
+;; Version: 0.4
 
 ;; This file is part of GNU Emacs.
 

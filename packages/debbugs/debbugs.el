@@ -5,7 +5,7 @@
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, hypermedia
 ;; Package: debbugs
-;; Version: 0.3
+;; Version: 0.4
 
 ;; This file is part of GNU Emacs.
 
@@ -24,10 +24,11 @@
 
 ;;; Commentary:
 
-;; This package provides some basic functions to access a debbugs SOAP
+;; This package provides basic functions to access a Debbugs SOAP
 ;; server (see <http://wiki.debian.org/DebbugsSoapInterface>).
 
-;; The SOAP function "get_versions" is not implemented (yet).
+;; The function "get_versions" is not implemented (yet).  "search_est"
+;; is an extension on <http://debbugs.gnu.org>.
 
 ;;; Code:
 
