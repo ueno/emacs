@@ -72,12 +72,16 @@ make archive-full >make.log 2>&1 || {
     signal_error "make archive-full failed" <make.log
     exit 1
 }
-(cd ~elpa
- rm -rf staging-old
- mv staging staging-old
- mv build/archive staging)
-(cd ~elpa/staging
+(cd archive
  tar zcf emacs-packages-latest.tgz packages)
+(cd ~elpa
+ # Not sure why we have `staging-old', but let's keep it for now.
+ rm -rf staging-old
+ cp -a staging staging-old
+ # Move new files into place but don't throw out old package versions.
+ mv build/archive/packages/* staging/packages/
+ mv build/archive/* staging/ 2>/dev/null
+ rm -rf build/archive)
 
 # "make archive-full" already does fetch the daily org build.
 #admin/org-synch.sh ~elpa/staging/packages ~elpa/build/admin

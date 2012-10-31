@@ -94,9 +94,52 @@ window configuration, [SM] will list strings and markers, etc."
 
 ;;; Variables, map, mode
 
-(defvar register-list-mode-map nil
+(defvar register-list-mode-map
+  (let ((map (make-keymap)))
+    (suppress-keymap map t)
+    (define-key map "q" 'quit-window)
+    (define-key map "Q" 'register-list-quit)
+    (define-key map [(tab)] 'register-list-tab)
+    (define-key map "d" 'register-list-mark-delete)
+    (define-key map "D" 'register-list-delete-duplicates)
+    (define-key map "c" 'register-list-mark-concat)
+    (define-key map "x" 'register-list-execute)
+    (define-key map "+" 'register-list-increment-key)
+    (define-key map "-" 'register-list-decrement-key)
+    (define-key map "e" 'register-list-edit-key)
+    (define-key map "E" 'register-list-edit-value)
+    (define-key map "f" 'register-list-toggle-fontification)
+    (define-key map " " 'next-line)
+    (define-key map "n" 'next-line)
+    (define-key map "p" 'previous-line)
+    (define-key map "u" 'register-list-unmark)
+    (define-key map "U" 'register-list-unmark-all)
+    (define-key map "g" 'register-list-refresh)
+    (define-key map "F"
+      (lambda () (interactive) (register-list-refresh "F")))
+    (define-key map "N"
+      (lambda () (interactive) (register-list-refresh "N")))
+    (define-key map "M"
+      (lambda () (interactive) (register-list-refresh "M")))
+    (define-key map "R"
+      (lambda () (interactive) (register-list-refresh "R")))
+    (define-key map "S"
+      (lambda () (interactive) (register-list-refresh "S")))
+    (define-key map "W"
+      (lambda () (interactive) (register-list-refresh "W")))
+    (define-key map "G"
+      (lambda() (interactive) (register-list-refresh "[FNMRSW]")))
+    (define-key map "?" 'describe-mode)
+
+    (define-key map [follow-link] 'mouse-face)
+    (define-key map [mouse-2] 'register-list-call-handler-at-mouse)
+    (define-key map [(return)] 'register-list-call-handler-at-point)
+    map)
   "Keymap for `register-list-mode'.")
-(defvar register-list-edit-value-mode-map (copy-keymap text-mode-map)
+(defvar register-list-edit-value-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") 'register-list-send-value)
+    map)
   "Keymap for editing the value of a register.")
 (defvar register-list-current-type nil
   "The current type for the register menu.")
@@ -113,50 +156,6 @@ Saved before editing the value of a register.")
   "The type of the edited value.")
 (defvar register-list-rectangle-column nil
   "End of a rectangle line.")
-
-(if register-list-mode-map
-  nil
-  (setq register-list-mode-map (make-keymap))
-  (suppress-keymap register-list-mode-map t)
-  (define-key register-list-mode-map "q" 'quit-window)
-  (define-key register-list-mode-map "Q" 'register-list-quit)
-  (define-key register-list-mode-map [(tab)] 'register-list-tab)
-  (define-key register-list-mode-map "d" 'register-list-mark-delete)
-  (define-key register-list-mode-map "D" 'register-list-delete-duplicates)
-  (define-key register-list-mode-map "c" 'register-list-mark-concat)
-  (define-key register-list-mode-map "x" 'register-list-execute)
-  (define-key register-list-mode-map "+" 'register-list-increment-key)
-  (define-key register-list-mode-map "-" 'register-list-decrement-key)
-  (define-key register-list-mode-map "e" 'register-list-edit-key)
-  (define-key register-list-mode-map "E" 'register-list-edit-value)
-  (define-key register-list-mode-map "f" 'register-list-toggle-fontification)
-  (define-key register-list-mode-map " " 'next-line)
-  (define-key register-list-mode-map "n" 'next-line)
-  (define-key register-list-mode-map "p" 'previous-line)
-  (define-key register-list-mode-map "u" 'register-list-unmark)
-  (define-key register-list-mode-map "U" 'register-list-unmark-all)
-  (define-key register-list-mode-map "g" 'register-list-refresh)
-  (define-key register-list-mode-map "F"
-    (lambda () (interactive) (register-list-refresh "F")))
-  (define-key register-list-mode-map "N"
-    (lambda () (interactive) (register-list-refresh "N")))
-  (define-key register-list-mode-map "M"
-    (lambda () (interactive) (register-list-refresh "M")))
-  (define-key register-list-mode-map "R"
-    (lambda () (interactive) (register-list-refresh "R")))
-  (define-key register-list-mode-map "S"
-    (lambda () (interactive) (register-list-refresh "S")))
-  (define-key register-list-mode-map "W"
-    (lambda () (interactive) (register-list-refresh "W")))
-  (define-key register-list-mode-map "G"
-    (lambda() (interactive) (register-list-refresh "[FNMRSW]")))
-  (define-key register-list-mode-map "?" 'describe-mode))
-
-(define-key register-list-mode-map [follow-link] 'mouse-face)
-(define-key register-list-mode-map [mouse-2] 'register-list-call-handler-at-mouse)
-(define-key register-list-mode-map [(return)] 'register-list-call-handler-at-point)
-(define-key register-list-edit-value-mode-map (kbd "C-c C-c")
-  'register-list-send-value)
 
 ;;; Marks
 
@@ -284,7 +283,7 @@ An optional TYPE argument restrict the list these types."
    (register-list register-list-current-type
 		  register-list-current-fontification)))
 
-(defun register-list-mode ()
+(define-derived-mode register-list-mode special-mode "Register List"
   "Major mode for editing a list of register keys.
 
 Each line is of the form:
@@ -325,12 +324,8 @@ copy the string to the kill ring or jump to the location.
 \\[register-list-refresh] -- refresh the register menu display.
 \\[register-list-tab] -- cycle between the key, the type and the value.
 \\[register-list-quit] -- quit the register menu."
-  (kill-all-local-variables)
-  (use-local-map register-list-mode-map)
   (setq truncate-lines t)
-  (setq buffer-read-only t)
-  (setq major-mode 'register-list-mode)
-  (setq mode-name "Register List"))
+  (setq buffer-read-only t))
 
 ;;\\[register-list-edit-key-or-value] -- edit the key for this register.
 
@@ -370,9 +365,10 @@ The list is displayed in a buffer named `*Register List*' in
 	  (or fontify register-list-preserve-fontification))
     (setq register-list-current-type type)
 
-    (setq register-alist ;; TODO better sorting
+    (setq register-alist ;; TODO better sorting.
 	  (sort register-alist (lambda (a b) (< (car a) (car b)))))
     (erase-buffer)
+    ;; FIXME: Why `intangible'?
     (insert (concat (propertize "% Key  Type  Value\n"
 				'face 'font-lock-type-face
 				'intangible t) ;; 'front-sticky t)
@@ -585,17 +581,12 @@ the register or copy its value into the kill ring."
       (register-list-edit-value-mode)
       (message "Press C-c C-c when you're done"))))
 
-(defun register-list-edit-value-mode nil
+(define-derived-mode register-list-edit-value-mode text-mode
+  "Edit Register Value"
   "Mode for editing the value of a register.
 When you are done editing the value, store it with \\[register-list-send-string].
 
-\\{register-list-edit-value-mode-map}"
-  (interactive)
-  (kill-all-local-variables)
-  (use-local-map register-list-edit-value-mode-map)
-  (setq major-mode 'register-list-edit-value-mode
-        mode-name "Edit Register Value")
-  (run-mode-hooks 'text-mode-hook))
+\\{register-list-edit-value-mode-map}")
 
 (defun register-list-add-rectangle-overlays (column)
   "Add overlays to display strings beyond COLUMN.
