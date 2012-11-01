@@ -30,8 +30,7 @@ signal_error () {
         cat -
         echo "Error: $title"
     else
-        set -- $(host -t mx gnu.org);
-        mx_gnu_org="$4"
+        mx_gnu_org="$(host -t mx gnu.org | sed 's/.*[ 	]//')"
         (sleep 5; echo "HELO elpa.gnu.org"
          sleep 1; echo "MAIL FROM: <elpa@elpa.gnu.org>"
          sleep 1; echo "RCPT TO: <emacs-elpa-diffs@gnu.org>"
@@ -43,7 +42,7 @@ Subject: $title
 
 ENDDOC
          cat -
-         echo ".") | telnet "$mx_gnu_org" smtp
+         echo "."; sleep 1) | telnet "$mx_gnu_org" smtp
     fi
 }
 
@@ -82,6 +81,11 @@ make archive-full >make.log 2>&1 || {
  mv build/archive/packages/* staging/packages/
  mv build/archive/* staging/ 2>/dev/null
  rm -rf build/archive)
+
+# Make the HTML files.
+(cd ~elpa/staging/packages
+ emacs --batch -l ~elpa/build/admin/archive-contents.el \
+       --eval '(batch-html-make-index)')
 
 # "make archive-full" already does fetch the daily org build.
 #admin/org-synch.sh ~elpa/staging/packages ~elpa/build/admin
