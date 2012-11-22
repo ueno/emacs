@@ -4,7 +4,7 @@
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; vcomment: Emacs-24.3's version is 1.0 so this has to stay below.
-;; Version: 0.1
+;; Version: 0.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -173,7 +173,7 @@
                callf2
                callf
                letf*
-               ;; letf
+               letf
                rotatef
                shiftf
                remf
@@ -275,6 +275,15 @@
   (let ((new (if (consp fun) (prog1 (cdr fun) (setq fun (car fun)))
                (intern (format "cl-%s" fun)))))
     (defalias new fun)))
+
+;; `cl-labels' is not 100% compatible with `labels' when using dynamic scoping
+;; (mostly because it does not turn lambdas that refer to those functions into
+;; closures).  OTOH it is compatible when using lexical scoping.
+
+(defmacro cl-labels (&rest args)
+  (if (and (boundp 'lexical-binding) lexical-binding)
+      `(labels ,@args)
+    (error "`cl-labels' with dynamic scoping is not implemented")))
 
 (provide 'cl-lib)
 ;;; cl-lib.el ends here
