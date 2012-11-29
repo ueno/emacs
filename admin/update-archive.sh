@@ -71,15 +71,26 @@ make archive-full >make.log 2>&1 || {
     signal_error "make archive-full failed" <make.log
     exit 1
 }
+latest="emacs-packages-latest.tgz"
 (cd archive
- tar zcf emacs-packages-latest.tgz packages)
+ tar zcf "$latest" packages)
 (cd ~elpa
  # Not sure why we have `staging-old', but let's keep it for now.
  rm -rf staging-old
  cp -a staging staging-old
  # Move new files into place but don't throw out old package versions.
- mv build/archive/packages/* staging/packages/
- mv build/archive/* staging/ 2>/dev/null
+ for f in build/archive/packages/*; do
+     dst="staging/packages/$(basename "$f")"
+     # FIXME: it'd be better to only rebuild the packages that have been
+     # modified, rather than rely on md5 to try and abort the refresh
+     # when we don't want it!
+     if [ -r "$dst" ] && [ "$(md5sum <"$f")" = "$(md5sum <"$dst")" ]; then
+         rm "$f"
+     else
+         mv "$f" "$dst"
+     fi
+ done
+ mv build/archive/"$latest" staging/
  rm -rf build/archive)
 
 # Make the HTML files.
