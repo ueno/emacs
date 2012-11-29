@@ -147,6 +147,13 @@ You can customize the number of bytes to
     (vlf-mode)
     (display-buffer (current-buffer))))
 
+(defun dired-vlf ()
+  "In Dired, visit the file on this line in VLF mode."
+  (interactive)
+  (vlf (dired-get-file-for-visit)))
+
+(eval-after-load "dired" '(define-key dired-mode-map "V" 'dired-vlf))
+
 (provide 'vlf)
 
 ;;; vlf.el ends here
