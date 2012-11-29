@@ -4,3 +4,5 @@ site
 packages/*/*-autoloads.el
 packages/*/*-pkg.el
 core
+ChangeLog
+packages/.changelog-witness

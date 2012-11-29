@@ -25,9 +25,17 @@ archive: archive-tmp
 
 archive-tmp: packages
 	mkdir -p $(ARCHIVE_TMP)
-	cp -r packages/. $(ARCHIVE_TMP)/packages
+	cp -a packages/. $(ARCHIVE_TMP)/packages
 
 process-archive:
+	# First, refresh the ChangeLog files.  This needs to be done in
+	# the source tree, because it needs the Bzr data!
+	cd packages; \
+	$(EMACS) -batch -l $(CURDIR)/admin/archive-contents.el \
+			-f batch-prepare-packages
+	# FIXME, we could probably speed this up significantly with
+	# rules like "%.tar: ../%/ChangeLog" so we only rebuild the packages
+	# that have indeed changed.
 	cd $(ARCHIVE_TMP)/packages; $(EMACS) -batch -l $(CURDIR)/admin/archive-contents.el -f batch-make-archive
 	@cd $(ARCHIVE_TMP)/packages; \
 	for pt in *; do \
@@ -43,8 +51,7 @@ process-archive:
 	rm -rf archive/packages-old
 	rm -rf $(ARCHIVE_TMP)
 
-## Deploy the package archive to archive/ including the Org daily and
-## admin scripts:
+## Deploy the package archive to archive/ including the Org daily:
 archive-full: archive-tmp org-fetch
 	$(MAKE) $(MFLAGS) process-archive
 	#mkdir -p archive/admin
