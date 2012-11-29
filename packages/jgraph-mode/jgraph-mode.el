@@ -1,8 +1,9 @@
 ;;; jgraph-mode.el --- Major mode for Jgraph files
 
-;; Copyright (C) 2006, 2011  Free Software Foundation, Inc
+;; Copyright (C) 2006, 2011-2012  Free Software Foundation, Inc
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
+;; Version: 1.0
 ;; Keywords: tex, wp
 
 ;; This file is part of GNU Emacs.
