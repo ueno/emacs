@@ -24,6 +24,7 @@ archive: archive-tmp
 	$(MAKE) $(MFLAGS) process-archive
 
 archive-tmp: packages
+	-rm -r $(ARCHIVE_TMP)
 	mkdir -p $(ARCHIVE_TMP)
 	cp -a packages/. $(ARCHIVE_TMP)/packages
 
