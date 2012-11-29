@@ -31,7 +31,7 @@
 ;;; ** installation
 ;; If you use GNU ELPA, install ampc via M-x package-list-packages RET or
 ;; (package-install 'ampc).  Otherwise, grab the files in this repository and
-;; put the emacs lisp ones somewhere in your load-path or add the directory the
+;; put the Emacs Lisp ones somewhere in your load-path or add the directory the
 ;; files are in to it, e.g.:
 ;;
 ;; (add-to-list 'load-path "~/.emacs.d/ampc")
@@ -363,7 +363,7 @@ invocation."
   "List of MPD commands that should be executed synchronously.
 Executing commands that print lots of output synchronously will
 result in massive performance improvements of ampc.  If the car
-of this list is `t', execute all commands synchronously other
+of this list is t, execute all commands synchronously other
 than the ones specified by the rest of the list."
   :type '(repeat symbol))
 
@@ -3062,7 +3062,7 @@ ampc is connected to."
 
 ;;;###autoload
 (defun ampc (&optional host port suspend)
-  "ampc is an asynchronous client for the MPD media player.
+  "Ampc is an asynchronous client for the MPD media player.
 This function is the main entry point for ampc.
 
 HOST and PORT specify the MPD instance to connect to.  The values
@@ -3076,9 +3076,9 @@ default to the ones specified in `ampc-default-server'."
   (unless port
     (setf port (or (cdr ampc-default-server) (read-string "Port: "))))
   (when (and ampc-connection
-             (or (not (equal host ampc-host))
-                 (not (equal port ampc-port))
-                 (not (ampc-on-p))))
+             (not (and (equal host ampc-host)
+                       (equal port ampc-port)
+                       (ampc-on-p))))
     (ampc-quit))
   (unless ampc-connection
     (let ((connection (open-network-stream "ampc"
@@ -3115,3 +3115,4 @@ default to the ones specified in `ampc-default-server'."
 ;; fill-column: 80
 ;; indent-tabs-mode: nil
 ;; End:
+;;; ampc.el ends here
