@@ -28,12 +28,38 @@
 ;; Make sure this is installed *late* in your `load-path`, i.e. after Emacs's
 ;; built-in .../lisp/emacs-lisp directory, so that if/when you upgrade to
 ;; Emacs-24.3, the built-in version of the file will take precedence, otherwise
-;; you'll quickly get recursive-load errors.
+;; you could get into trouble (although we try to hack our way around the
+;; problem in case it happens).
 
 ;; This code is largely copied from Emacs-24.3's cl.el, with the alias bindings
 ;; simply reversed.
 
 ;;; Code:
+
+(when (functionp 'macroexp--compiler-macro)
+  ;; `macroexp--compiler-macro' was introduced as part of the big CL
+  ;; reorganization which moved/reimplemented some of CL into core (mostly the
+  ;; setf and compiler-macro support), so its presence indicates we're running
+  ;; in an Emacs that comes with the new cl-lib.el, where this file should
+  ;; never be loaded!
+  (message "Real cl-lib shadowed by compatibility cl-lib? (%s)" load-file-name)
+  (when load-file-name
+    ;; (message "Let's try to patch things up")
+    (let ((loaddir (file-name-directory load-file-name))
+          load-path-dir)
+      ;; Find the problematic directory from load-path.
+      (dolist (dir load-path)
+        (if (equal loaddir (expand-file-name (file-name-as-directory dir)))
+            (setq load-path-dir dir)))
+      (when load-path-dir
+        ;; (message "Let's move the offending dir to the end")
+        (setq load-path (append (remove load-path-dir load-path)
+                                (list load-path-dir)))
+        ;; Here we could manually load cl-lib and then return immediately.
+        ;; But Emacs currently doesn't provide any way for a file to "return
+        ;; immediately", so instead we make sure the rest of the file does not
+        ;; throw away any pre-existing definition.
+        ))))
 
 (require 'cl)
 
@@ -64,7 +90,8 @@
                most-positive-float
                ;; custom-print-functions
                ))
-  (defvaralias (intern (format "cl-%s" var)) var))
+  (let ((new (intern (format "cl-%s" var))))
+    (unless (boundp new) (defvaralias new var))))
 
 (dolist (fun '(
                (get* . cl-get)
@@ -274,16 +301,17 @@
                ))
   (let ((new (if (consp fun) (prog1 (cdr fun) (setq fun (car fun)))
                (intern (format "cl-%s" fun)))))
-    (defalias new fun)))
+    (unless (fboundp new) (defalias new fun))))
 
 ;; `cl-labels' is not 100% compatible with `labels' when using dynamic scoping
 ;; (mostly because it does not turn lambdas that refer to those functions into
 ;; closures).  OTOH it is compatible when using lexical scoping.
 
-(defmacro cl-labels (&rest args)
-  (if (and (boundp 'lexical-binding) lexical-binding)
-      `(labels ,@args)
-    (error "`cl-labels' with dynamic scoping is not implemented")))
+(unless (fboundp 'cl-labels)
+  (defmacro cl-labels (&rest args)
+    (if (and (boundp 'lexical-binding) lexical-binding)
+        `(labels ,@args)
+      (error "`cl-labels' with dynamic scoping is not implemented"))))
 
 (provide 'cl-lib)
 ;;; cl-lib.el ends here
