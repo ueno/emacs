@@ -483,7 +483,7 @@ Limit searched to BOUND.
 
 ;;;***
 
-(provide 'auto-loads)
+;;(provide 'auto-loads)
 
 ;;; preview-latex.el --- automatically extracted autoloads
 ;;
@@ -522,7 +522,7 @@ Report a bug in the preview-latex package.
 
 ;;;***
 
-(provide 'preview-latex)
+;;(provide 'preview-latex)
 ;; Local Variables:
 ;; version-control: never
 ;; no-byte-compile: t
