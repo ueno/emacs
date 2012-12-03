@@ -1,7 +1,6 @@
 ;;; preview.el --- embed preview LaTeX images in source buffer
 
-;; Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2010 Free
-;;   Software Foundation, Inc.
+;; Copyright (C) 2001-2006, 2010, 2012  Free Software Foundation, Inc.
 
 ;; Author: David Kastrup
 ;; Keywords: tex, wp, convenience
