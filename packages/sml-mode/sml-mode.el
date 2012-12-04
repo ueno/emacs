@@ -3,7 +3,7 @@
 ;; Copyright (C) 1989,1999,2000,2004,2007,2010-2012  Free Software Foundation, Inc.
 
 ;; Maintainer: (Stefan Monnier) <monnier@iro.umontreal.ca>
-;; Version: 6.1
+;; Version: 6.2
 ;; Keywords: SML
 ;; Author:	Lars Bo Nielsen
 ;;		Olin Shivers
@@ -164,6 +164,8 @@ notion of \"the end of an outline\".")
     (define-key map "\M-|" 'sml-electric-pipe)
     (define-key map "\M-\ " 'sml-electric-space)
     (define-key map [backtab] 'sml-back-to-outer-indent)
+    ;; The standard binding is C-c C-z, but we add this one for compatibility.
+    (define-key map "\C-c\C-s" 'sml-prog-proc-switch-to)
     map)
   "The keymap used in `sml-mode'.")
 
@@ -755,6 +757,7 @@ Assumes point is right before the | symbol."
 
 (defun sml-prog-proc-switch-to ()
   "Switch to the buffer running the read-eval-print process."
+  (interactive)
   (pop-to-buffer (sml-prog-proc-buffer)))
 
 (defun sml-prog-proc-send-string (proc str)
