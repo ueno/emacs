@@ -1,10 +1,11 @@
 ;;; virtex.el - Common code for all TeX formats.
 
-;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
+;; $Id: virtex.el,v 1.1 1994/01/23 08:14:44 amanda Exp $
 
 ;;; Code:
 
 (TeX-add-style-hook "virtex"
+ (function
   (lambda ()
     (TeX-add-symbols "/" "above" "abovedisplayshortskip"
 		     "abovedisplayskip" "abovewithdelims" "accent"
@@ -77,6 +78,6 @@
 		     "vcenter" "vfil" "vfill" "vfilneg" "vfuzz"
 		     "voffset" "vrule" "vsize" "vskip" "vss" "vtop"
 		     "wd" "widowpenalty" "write" "xdef" "xleaders"
-		     "xspaceskip" "year")))
+		     "xspaceskip" "year"))))
 
 ;;; virtex.el ends here
