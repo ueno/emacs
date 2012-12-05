@@ -1,1 +1,1 @@
-(define-package "auctex" "11.87" "Integrated environment for *TeX*")
+(define-package "auctex" "11.86" "Integrated environment for *TeX*")
