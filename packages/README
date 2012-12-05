@@ -1,0 +1,11 @@
+This directory contains most of the source code of the GNU ELPA packages.
+
+Each directory in here corresponds to a package, which can be
+either a single-file package or a multifile package.
+
+A nightly cron job refreshes the GNU ELPA archive from this repository.
+
+This cron job only creates a new package when the "version" of a package
+is modified.  This means that you can safely work on the next version here
+without worrying about the unstable code making it to GNU ELPA, and simply
+update the "version" when you want to release the new code.
