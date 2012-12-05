@@ -84,10 +84,12 @@ latest="emacs-packages-latest.tgz"
      # FIXME: it'd be better to only rebuild the packages that have been
      # modified, rather than rely on md5 to try and abort the refresh
      # when we don't want it!
-     if [ -r "$dst" ] && [ "$(md5sum <"$f")" = "$(md5sum <"$dst")" ]; then
-         rm "$f"
-     else
-         mv "$f" "$dst"
+     # Actually, let's never overwrite an existing version.  So changes can
+     # be installed without causing a new package to be build until the
+     # version field is changed.
+     if [ -r "$dst" ] # && [ "$(md5sum <"$f")" = "$(md5sum <"$dst")" ]
+     then rm "$f"
+     else mv "$f" "$dst"
      fi
  done
  mv build/archive/"$latest" staging/
