@@ -41,9 +41,7 @@
  "bulgarian"
  (lambda ()
    (set-syntax-table LaTeX-bulgarian-mode-syntax-table)
-   (unless (eq (car TeX-quote-language) 'override)
-     (setq TeX-quote-language
-	   `("bulgarian" "\"`" "\"'" ,TeX-quote-after-quote)))
+   (setq TeX-quote-language `("bulgarian" "\"`" "\"'" ,TeX-quote-after-quote))
    (setq LaTeX-babel-hyphen-language "bulgarian")
    ;; Fontification of quotation marks.
    (when (fboundp 'font-latex-add-quotes)
