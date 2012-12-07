@@ -81,13 +81,12 @@ latest="emacs-packages-latest.tgz"
  # Move new files into place but don't throw out old package versions.
  for f in build/archive/packages/*; do
      dst="staging/packages/$(basename "$f")"
-     # FIXME: it'd be better to only rebuild the packages that have been
-     # modified, rather than rely on md5 to try and abort the refresh
-     # when we don't want it!
      # Actually, let's never overwrite an existing version.  So changes can
-     # be installed without causing a new package to be build until the
-     # version field is changed.
-     if [ -r "$dst" ] # && [ "$(md5sum <"$f")" = "$(md5sum <"$dst")" ]
+     # be installed without causing a new package to be built until the
+     # version field is changed.  Some files need to be excluded from the
+     # "immutable" policy, most importantly "archive-contents".
+     if [ -r "$dst" ] &&
+        [ ! "archive-contents" = "$(basename "$dst")" ]
      then rm "$f"
      else mv "$f" "$dst"
      fi
