@@ -66,6 +66,9 @@ doc/**/*.pdf
 !doc/lispintro/cons-*.pdf
 !doc/lispintro/drawers.pdf
 !doc/lispintro/lambda-*.pdf
+etc/emacs.tmpdesktop
+etc/refcards/*.aux
+etc/refcards/*.log
 info/*.info
 admin/unidata/unidata.txt
 build-aux/compile
@@ -85,6 +88,7 @@ lib/alloca.h
 lib/arg-nonnull.h
 lib/c++defs.h
 lib/execinfo.h
+lib/fcntl.h
 lib/getopt.h
 lib/inttypes.h
 lib/stdalign.h
@@ -130,6 +134,10 @@ lisp/eshell/esh-groups.el
 lisp/finder-inf.el
 lisp/gnus/_dir-locals.el
 nextstep/Emacs.app
+nextstep/Cocoa/Emacs.base/Contents/Info.plist
+nextstep/Cocoa/Emacs.base/Contents/Resources/English.lproj
+nextstep/GNUstep/Emacs.base/Resources/Emacs.desktop
+nextstep/GNUstep/Emacs.base/Resources/Info-gnustep.plist
 nt/config.log
 src/_dbxinit
 src/_gdbinit
@@ -145,6 +153,7 @@ src/gdb.ini
 src/prefix-args*
 src/stamp-oldxmenu
 src/stamp-h.in
+src/emacs.res
 src/temacs
 test/indent/*.new
 +*
@@ -153,3 +162,7 @@ src/gl-stamp
 lisp/mh-e/mh-autoloads.el
 lisp/mh-e/mh-cus-load.el
 lib/stdalign.h
+admin/charsets/*.map
+admin/charsets/cp51932.el
+admin/charsets/eucjp-ms.el
+admin/charsets/jisx2131-filter
