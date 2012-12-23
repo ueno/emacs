@@ -220,7 +220,6 @@ suppressed bugs is toggled by `debbugs-gnu-toggle-suppress'."
 (defvar debbugs-gnu-widget-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\r" 'widget-button-press)
-    (define-key map [mouse-1] 'widget-button-press)
     (define-key map [mouse-2] 'widget-button-press)
     map))
 
