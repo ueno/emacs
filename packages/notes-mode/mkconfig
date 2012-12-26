@@ -32,10 +32,11 @@ my($home_dir) = ((getpwuid($<))[7]);
 
 my(%defaults) = (
     'dir'	=> ['path', '~/NOTES'],
-    'bin_dir'	=> ['path', "$ENV{'NOTES_BIN_DIR'}"],
     'int_form'	=> ['form', '%Y%m'],
     'file_form'	=> ['form', '%y%m%d'],
     );
+$defaults{'bin_dir'} = ['path', "$ENV{'NOTES_BIN_DIR'}"]
+    if defined($ENV{'NOTES_BIN_DIR'});
 
 my($key, $value, %notes);
 while (($key, $value) = each %defaults) {
