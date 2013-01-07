@@ -137,10 +137,10 @@
 
 (require 'debbugs)
 (require 'widget)
+(require 'wid-edit)
 (require 'tabulated-list)
 (eval-when-compile (require 'cl))
 
-(autoload 'widget-convert "wid-edit.el")
 (autoload 'gnus-read-ephemeral-emacs-bug-group "gnus-group")
 (autoload 'mail-header-subject "nnheader")
 (autoload 'gnus-summary-article-header "gnus-sum")
@@ -570,8 +570,6 @@ marked as \"client-side filter\"."
 
 (defvar debbugs-gnu-current-widget nil)
 (defvar debbugs-gnu-current-limit nil)
-
-(defvar widget-mouse-face)
 
 (defun debbugs-gnu-show-reports (widget)
   "Show bug reports as given in WIDGET property :bug-ids."
