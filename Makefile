@@ -5,7 +5,7 @@ EMACS=emacs
 ARCHIVE_TMP=archive-tmp
 SITE_DIR=site
 
-.PHONY: archive-tmp process-archive archive-full org-fetch clean all do-it
+.PHONY: archive-tmp changelogs process-archive archive-full org-fetch clean all do-it
 
 ## Set up the source files for direct usage, by pointing
 ## `package-directory-list' to the site/ directory.
@@ -23,17 +23,19 @@ site/%: do-it
 archive: archive-tmp
 	$(MAKE) $(MFLAGS) process-archive
 
-archive-tmp: packages
+archive-tmp: packages changelogs
 	-rm -r $(ARCHIVE_TMP)
 	mkdir -p $(ARCHIVE_TMP)
 	cp -a packages/. $(ARCHIVE_TMP)/packages
 
-process-archive:
-	# First, refresh the ChangeLog files.  This needs to be done in
-	# the source tree, because it needs the Bzr data!
+# Refresh the ChangeLog files.  This needs to be done in
+# the source tree, because it needs the Bzr data!
+changelogs:
 	cd packages; \
 	$(EMACS) -batch -l $(CURDIR)/admin/archive-contents.el \
 			-f batch-prepare-packages
+
+process-archive:
 	# FIXME, we could probably speed this up significantly with
 	# rules like "%.tar: ../%/ChangeLog" so we only rebuild the packages
 	# that have indeed changed.
