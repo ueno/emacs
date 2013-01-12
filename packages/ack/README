@@ -15,6 +15,8 @@ key bindings may be useful:
 
 - `M-I' inserts a template for case-insensitive file name search
 - `M-G' inserts a template for `git grep', `hg grep' or `bzr grep'
+- `M-Y' inserts the symbol at point from the window before entering
+   the minibuffer
 - `TAB' completes ack options
 
 This package does not require `--nogroup' nor `--noheading'.
