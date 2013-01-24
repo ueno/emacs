@@ -1227,7 +1227,6 @@ TAB file name completion, as in shell-mode, etc.."
 This mode runs `sml-mode-hook' just before exiting.
 See also (info \"(sml-mode)Top\").
 \\{sml-mode-map}"
-  (set (make-local-variable 'sml-prog-proc-descriptor) sml-pp-functions)
   (set (make-local-variable 'font-lock-defaults) sml-font-lock-defaults)
   (set (make-local-variable 'outline-regexp) sml-outline-regexp)
   (set (make-local-variable 'imenu-create-index-function)
@@ -1254,6 +1253,7 @@ See also (info \"(sml-mode)Top\").
   (sml-mode-variables))
 
 (defun sml-mode-variables ()
+  (set (make-local-variable 'sml-prog-proc-descriptor) sml-pp-functions)
   (set-syntax-table sml-mode-syntax-table)
   (setq local-abbrev-table sml-mode-abbrev-table)
   ;; Setup indentation and sexp-navigation.
