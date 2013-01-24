@@ -1,6 +1,6 @@
 ;;; sml-mode.el --- Major mode for editing (Standard) ML  -*- lexical-binding: t; coding: utf-8 -*-
 
-;; Copyright (C) 1989,1999,2000,2004,2007,2010-2012  Free Software Foundation, Inc.
+;; Copyright (C) 1989,1999,2000,2004,2007,2010-2013  Free Software Foundation, Inc.
 
 ;; Maintainer: (Stefan Monnier) <monnier@iro.umontreal.ca>
 ;; Version: 6.2
@@ -1201,7 +1201,7 @@ TAB file name completion, as in shell-mode, etc.."
   (add-hook 'next-error-hook 'inferior-sml-next-error-hook)
 
   ;; Make TAB add a " rather than a space at the end of a file name.
-  (set (make-local-variable 'comint-completion-addsuffix) '(?/ . ?\"))
+  (set (make-local-variable 'comint-completion-addsuffix) '("/" . "\""))
 
   (set (make-local-variable 'font-lock-defaults)
        inferior-sml-font-lock-defaults)
