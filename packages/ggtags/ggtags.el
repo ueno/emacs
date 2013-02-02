@@ -84,8 +84,9 @@ If nil, use Emacs default."
          (error "No global buffer found"))
      (with-current-buffer compilation-last-buffer ,@body)))
 
-(defun ggtags-cache-timestamp (root)
-  "Get the timestamp of file GTAGS in ROOT directory."
+(defun ggtags-get-timestamp (root)
+  "Get the timestamp (float) of file GTAGS in ROOT directory.
+Return -1 if it does not exist."
   (let ((file (expand-file-name "GTAGS" root)))
     (if (file-exists-p file)
         (float-time (nth 5 (file-attributes file)))
@@ -112,7 +113,7 @@ If nil, use Emacs default."
 
 (defun ggtags-cache-stale-p (key)
   "Value is non-nil if tags in cache needs to be rebuilt."
-  (> (ggtags-cache-timestamp key)
+  (> (ggtags-get-timestamp key)
      (or (fourth (ggtags-cache-get key)) 0)))
 
 ;;;###autoload
@@ -154,28 +155,29 @@ If nil, use Emacs default."
                       (split-string
                        (with-output-to-string
                          (call-process "global" nil (list standard-output nil)
-                                       nil "-c" (or prefix "")))))))
+                                       nil "-cT" (or prefix "")))))))
           (when tags
             (ggtags-cache-set root tags))
           tags)
       (cadr (ggtags-cache-get root)))))
 
-(defun ggtags-read-tag (&optional reference)
+(defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
   (let* ((tags (ggtags-tag-names))
          (sym (thing-at-point 'symbol))
          (default (and (member sym tags) sym)))
     (setq ggtags-current-tag-name
-          (completing-read
-           (format (if default
-                       "%s for tag (default %s): "
-                     "%s for tag: ")
-                   (if reference "Reference" "Definition") default)
-           tags nil t nil nil default))))
+          (if quick (or default (error "No valid tag at point"))
+            (completing-read
+             (format (if default "Tag (default %s): " "Tag: ") default)
+             tags nil t nil nil default)))))
 
 ;;;###autoload
-(defun ggtags-find-tag (name &optional reference)
-  (interactive (list (ggtags-read-tag current-prefix-arg)
+(defun ggtags-find-tag (name &optional verbose)
+  "Find definitions or references to tag NAME by context.
+If point is at a definition tag, find references, and vice versa.
+When called with prefix, ask the name and kind of tag."
+  (interactive (list (ggtags-read-tag (not current-prefix-arg))
                      current-prefix-arg))
   (ggtags-check-root-directory)
   (ggtags-navigation-mode +1)
@@ -183,37 +185,25 @@ If nil, use Emacs default."
   (let ((split-window-preferred-function
          (lambda (w) (split-window (frame-root-window w))))
         (default-directory (ggtags-root-directory)))
-    (compilation-start (format "global -v%s --result=grep \"%s\""
-                               (if reference "r" "") name)
-                       'ggtags-global-mode)))
+    (compilation-start
+     (if verbose
+         (format "global -v%s --result=grep \"%s\""
+                 (if (y-or-n-p "Kind (y for definition n for reference)? ")
+                     "" "r")
+                 name)
+       (format "global -v --result=grep --from-here=%d:%s \"%s\""
+               (line-number-at-pos)
+               (expand-file-name buffer-file-name)
+               name))
+     'ggtags-global-mode)))
 
 (defun ggtags-find-tag-resume ()
   (interactive)
   (ggtags-ensure-global-buffer
     (ggtags-navigation-mode +1)
-    (compile-goto-error)))
-
-(defvar ggtags-tag-overlay nil)
-(make-variable-buffer-local 'ggtags-tag-overlay)
-
-(defun ggtags-highlight-tag-at-point ()
-  (unless (overlayp ggtags-tag-overlay)
-    (setq ggtags-tag-overlay (make-overlay (point) (point)))
-    (overlay-put ggtags-tag-overlay 'ggtags t))
-  (let ((bounds (bounds-of-thing-at-point 'symbol)))
-    (cond
-     ((not bounds)
-      (overlay-put ggtags-tag-overlay 'face nil)
-      (move-overlay ggtags-tag-overlay (point) (point)))
-     ((notany (lambda (o)
-                (overlay-get o 'ggtags))
-              (overlays-at (car bounds)))
-      (move-overlay ggtags-tag-overlay (car bounds) (cdr bounds))
-      (overlay-put ggtags-tag-overlay 'face
-                   (when (member (buffer-substring (car bounds) (cdr bounds))
-                                 (ggtags-tag-names))
-                     'ggtags-highlight))
-      (overlay-put ggtags-tag-overlay 'window t)))))
+    (let ((split-window-preferred-function
+           (lambda (w) (split-window (frame-root-window w)))))
+      (compile-goto-error))))
 
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (let ((count (save-excursion
@@ -366,13 +356,18 @@ If nil, use Emacs default."
   "Kill all buffers visiting files in the root directory."
   (interactive "p")
   (ggtags-check-root-directory)
-  (let ((root (ggtags-root-directory))
-        (count 0))
+  (let ((gtagslibpath (split-string (or (getenv "GTAGSLIBPATH") "") ":" t))
+        (root (ggtags-root-directory))
+        (count 0)
+        (some (lambda (pred list)
+                (loop for x in list when (funcall pred x) return it))))
     (dolist (buf (buffer-list))
       (let ((file (and (buffer-live-p buf)
                        (not (eq buf (current-buffer)))
                        (buffer-file-name buf))))
-        (when (and file (file-in-directory-p (file-truename file) root))
+        (when (and file (funcall some (apply-partially #'file-in-directory-p
+                                                       (file-truename file))
+                                 (cons root gtagslibpath)))
           (and (kill-buffer buf)
                (incf count)))))
     (and interactive
@@ -382,10 +377,45 @@ If nil, use Emacs default."
   (let ((root (ggtags-root-directory)))
     (and root (ggtags-cache-mark-dirty root t))))
 
+(defvar ggtags-tag-overlay nil)
+(defvar ggtags-highlight-tag-timer nil)
+(make-variable-buffer-local 'ggtags-tag-overlay)
+
+(defun ggtags-highlight-tag-at-point (buffer)
+  (when (eq buffer (current-buffer))
+    (unless (overlayp ggtags-tag-overlay)
+      (setq ggtags-tag-overlay (make-overlay (point) (point)))
+      (overlay-put ggtags-tag-overlay 'ggtags t))
+    (let* ((bounds (bounds-of-thing-at-point 'symbol))
+           (valid-tag (when bounds
+                        (member (buffer-substring (car bounds) (cdr bounds))
+                                (ggtags-tag-names))))
+           (o ggtags-tag-overlay)
+           (done-p (lambda ()
+                     (and (memq o (overlays-at (car bounds)))
+                          (= (overlay-start o) (car bounds))
+                          (= (overlay-end o) (cdr bounds))
+                          (or (and valid-tag (overlay-get o 'face))
+                              (and (not valid-tag) (not (overlay-get o 'face))))))))
+      (cond
+       ((not bounds)
+        (overlay-put ggtags-tag-overlay 'face nil)
+        (move-overlay ggtags-tag-overlay (point) (point)))
+       ((not (funcall done-p))
+        (move-overlay o (car bounds) (cdr bounds))
+        (overlay-put o 'face (and valid-tag 'ggtags-highlight)))))))
+
+(defun ggtags-post-command-function ()
+  (when (timerp ggtags-highlight-tag-timer)
+    (cancel-timer ggtags-highlight-tag-timer))
+  (setq ggtags-highlight-tag-timer
+        (run-with-idle-timer 0.2 nil 'ggtags-highlight-tag-at-point
+                             (current-buffer))))
+
 (defvar ggtags-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\M-." 'ggtags-find-tag)
-    (define-key map "\C-c\M-n" 'ggtags-find-tag-resume)
+    (define-key map "\M-," 'ggtags-find-tag-resume)
     (define-key map "\C-c\M-k" 'ggtags-kill-file-buffers)
     map))
 
@@ -394,13 +424,12 @@ If nil, use Emacs default."
   :lighter (:eval (if ggtags-navigation-mode "" " GG"))
   (if ggtags-mode
       (progn
-        (unless (ggtags-root-directory)
-          (funcall (if (fboundp 'user-error) 'user-error 'message)
-                   "File GTAGS not found"))
+        (or (ggtags-root-directory)
+            (message "File GTAGS not found"))
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
-        (add-hook 'post-command-hook 'ggtags-highlight-tag-at-point nil t))
+        (add-hook 'post-command-hook 'ggtags-post-command-function nil t))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
-    (remove-hook 'post-command-hook 'ggtags-highlight-tag-at-point t)
+    (remove-hook 'post-command-hook 'ggtags-post-command-function t)
     (and (overlayp ggtags-tag-overlay)
          (delete-overlay ggtags-tag-overlay))
     (setq ggtags-tag-overlay nil)))
