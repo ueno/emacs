@@ -1,9 +1,9 @@
-;;; ack.el --- Emacs interface to ack
+;;; ack.el --- Emacs interface to ack           -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2012, 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8
+;; Version: 0.9
 ;; Keywords: tools, processes, convenience
 ;; Created: 2012-03-24
 ;; URL: https://github.com/leoliu/ack-el
@@ -30,8 +30,7 @@
 
 (require 'compile)
 (require 'ansi-color)
-(when (>= emacs-major-version 24)
-  (autoload 'shell-completion-vars "shell"))
+(autoload 'shell-completion-vars "shell")
 
 (defgroup ack nil
   "Run `ack' and display the results."
@@ -129,10 +128,6 @@ This function is called from `compilation-filter-hook'."
   "Additional things to highlight in ack output.
 This gets tacked on the end of the generated expressions.")
 
-(when (< emacs-major-version 24)
-  (defvar ack--column-start 'ack--column-start)
-  (defvar ack--column-end 'ack--column-end))
-
 (defun ack--column-start ()
   (or (let* ((beg (match-end 0))
              (end (save-excursion
@@ -171,48 +166,11 @@ This gets tacked on the end of the generated expressions.")
                        (min (1+ (line-end-position)) (point-max)) 'ack-file file)
     (list file)))
 
-;;; For emacs < 24
-(when (< emacs-major-version 24)
-  (defun ack--line (file col)
-    (if (string-match-p "\\`[1-9][0-9]*\\'" (car file))
-        (let ((has-ansi-color (overlays-at (match-beginning 1))))
-          ;; See `compilation-mode-font-lock-keywords' where there is
-          ;; overriding font-locking of FILE. Thus use the display
-          ;; property here to avoid being overridden.
-          (put-text-property
-           (match-beginning 1) (match-end 1)
-           'display
-           (propertize (match-string-no-properties 1)
-                       'face (list (and (not has-ansi-color)
-                                        compilation-line-face)
-                                   :weight 'normal :inherit 'underline)))
-          (list nil (ack--file)
-                (string-to-number (match-string 1))
-                (1- (string-to-number (match-string 3)))))
-      (put-text-property (match-beginning 3)
-                         (match-end 3)
-                         'font-lock-face compilation-line-face)
-      (list nil file
-            (string-to-number (match-string 3))
-            (when (match-string 4)
-              (put-text-property (match-beginning 4)
-                                 (match-end 4)
-                                 'font-lock-face compilation-column-face)
-              (1- (string-to-number (match-string 4))))))))
-
-;;; In emacs-24 and above, `compilation-mode-font-lock-keywords' ->
+;;; `compilation-mode-font-lock-keywords' ->
 ;;; `compilation--ensure-parse' -> `compilation--parse-region' ->
 ;;; `compilation-parse-errors' -> `compilation-error-properties'.
 ;;; `compilation-error-properties' returns nil if a previous pattern
 ;;; in the regexp alist has already been applied in a region.
-;;;
-;;; In emacs-23, `ack-regexp-alist' is a part of `font-lock-keywords'
-;;; after some transformation, so later entries can override earlier
-;;; entries.
-;;;
-;;; The output of 'ack --group --column WHATEVER' matches both regexps
-;;; in `ack-regexp-alist' and this fails emacs-23 in finding the right
-;;; file. So ack--line is used to disambiguate this case.
 
 (defconst ack-error-regexp-alist
   `(;; grouping line (--group or --heading)
@@ -221,14 +179,10 @@ This gets tacked on the end of the generated expressions.")
      nil nil (4 compilation-column-face nil t))
     ;; none grouping line (--nogroup or --noheading)
     ("^\\(.+?\\)\\(:\\|-\\)\\([1-9][0-9]*\\)\\2\\(?:\\(?4:[1-9][0-9]*\\)\\2\\)?"
-     ,@(if (>= emacs-major-version 24)
-           '(1 3 (ack--column-start . ack--column-end)
-               nil nil (4 compilation-column-face nil t))
-         '(1 ack--line 4)))
+     1 3 (ack--column-start . ack--column-end)
+     nil nil (4 compilation-column-face nil t))
     ("^Binary file \\(.+\\) matches$" 1 nil nil 0 1))
   "Ack version of `compilation-error-regexp-alist' (which see).")
-
-(defvar ack--ansi-color-last-marker)
 
 (defvar ack-process-setup-function 'ack-process-setup)
 
@@ -237,8 +191,6 @@ This gets tacked on the end of the generated expressions.")
   (when (string-match-p "^[ \t]*hg[ \t]" (car compilation-arguments))
     (setq compilation-error-regexp-alist
           '(("^\\(.+?:[0-9]+:\\)\\(?:\\([0-9]+\\):\\)?" 1 2)))
-    (when (< emacs-major-version 24)
-      (setq font-lock-keywords (compilation-mode-font-lock-keywords)))
     (make-local-variable 'compilation-parse-errors-filename-function)
     (setq compilation-parse-errors-filename-function
           (lambda (file)
@@ -257,21 +209,19 @@ This gets tacked on the end of the generated expressions.")
                   (match-string 1 file)
                 file))))))
 
+(defun ack-mode-display-match ()
+  "Display in another window the match in current line."
+  (interactive)
+  (setq compilation-current-error (point))
+  (next-error-no-select 0))
+
 (define-compilation-mode ack-mode "Ack"
   "A compilation mode tailored for ack."
   (set (make-local-variable 'compilation-disable-input) t)
   (set (make-local-variable 'compilation-error-face)
        'compilation-info)
-  (if (>= emacs-major-version 24)
-      (add-hook 'compilation-filter-hook 'ack-filter nil t)
-    (set (make-local-variable 'ack--ansi-color-last-marker)
-         (point-min-marker))
-    (font-lock-add-keywords
-     nil '(((lambda (limit)
-              (let ((beg (marker-position ack--ansi-color-last-marker)))
-                (move-marker ack--ansi-color-last-marker limit)
-                (ansi-color-apply-on-region beg ack--ansi-color-last-marker))
-              nil))))))
+  (add-hook 'compilation-filter-hook 'ack-filter nil t)
+  (define-key ack-mode-map "\C-o" #'ack-mode-display-match))
 
 (defun ack-update-minibuffer-prompt (prompt)
   "Visually replace minibuffer prompt with PROMPT."
@@ -285,7 +235,7 @@ This gets tacked on the end of the generated expressions.")
   (interactive)
   (delete-minibuffer-contents)
   (let ((ack (or (car (split-string ack-command nil t)) "ack")))
-    (skeleton-insert '(nil ack " -g '(?i:" _ ")'"))))
+    (skeleton-insert `(nil ,ack " -g '(?i:" _ ")'"))))
 
 (defvar project-root)                   ; dynamically bound in `ack'
 
@@ -306,7 +256,7 @@ This gets tacked on the end of the generated expressions.")
      (format "Run %s grep in `%s': " backend
              (file-name-nondirectory (directory-file-name project-root))))
     (delete-minibuffer-contents)
-    (skeleton-insert '(nil cmd " '" _ "'"))))
+    (skeleton-insert `(nil ,cmd " '" _ "'"))))
 
 (defun ack-yank-symbol-at-point ()
   "Yank the symbol from the window before entering the minibuffer."
@@ -321,9 +271,7 @@ This gets tacked on the end of the generated expressions.")
 (defvar ack-minibuffer-local-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
-    (define-key map "\t" (if (>= emacs-major-version 24)
-                             'completion-at-point
-                           'pcomplete))
+    (define-key map "\t" 'completion-at-point)
     (define-key map "\M-I" 'ack-skel-file)
     (define-key map "\M-G" 'ack-skel-vc-grep)
     (define-key map "\M-Y" 'ack-yank-symbol-at-point)
@@ -370,9 +318,7 @@ minibuffer:
                            default-directory))
          ;; Disable completion cycling; see http://debbugs.gnu.org/12221
          (completion-cycle-threshold nil))
-     (list (minibuffer-with-setup-hook (if (>= emacs-major-version 24)
-                                           'shell-completion-vars
-                                         'pcomplete-shell-setup)
+     (list (minibuffer-with-setup-hook 'shell-completion-vars
              (read-from-minibuffer
               (format "Run ack in `%s': "
                       (file-name-nondirectory
