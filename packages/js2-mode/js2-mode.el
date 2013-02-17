@@ -1,11 +1,11 @@
 ;;; js2-mode.el --- Improved JavaScript editing mode
 
-;; Copyright (C) 2009, 2011, 2012  Free Software Foundation, Inc.
+;; Copyright (C) 2009, 2011-2013  Free Software Foundation, Inc.
 
 ;; Author: Steve Yegge <steve.yegge@gmail.com>
 ;;         mooz <stillpedant@gmail.com>
 ;;         Dmitry Gutov <dgutov@yandex.ru>
-;; Version: 1.1
+;; Version: 20130217
 ;; Keywords: languages, javascript
 ;; Package-Requires: ((emacs "24.1"))
 
@@ -219,7 +219,6 @@ Similar to `c-basic-offset'."
   :type 'integer)
 (js2-mark-safe-local 'js2-basic-offset 'integerp)
 
-
 (defcustom js2-bounce-indent-p nil
   "Non-nil to have indent-line function choose among alternatives.
 If nil, the indent-line function will indent to a predetermined column
@@ -292,8 +291,7 @@ even if this flag is non-nil."
 
 (defcustom js2-strict-trailing-comma-warning t
   "Non-nil to warn about trailing commas in array literals.
-Ecma-262 forbids them, but many browsers permit them.  IE is the
-big exception, and can produce bugs if you have trailing commas."
+Ecma-262-5.1 allows them, but older versions of IE raise an error."
   :type 'boolean
   :group 'js2-mode)
 
@@ -361,7 +359,7 @@ Examples:
   var foo = {int: 5, while: 6, continue: 7};
   foo.return = 8;
 
-Ecma-262 forbids this syntax, but many browsers support it."
+Ecma-262 5.1 allows this syntax, but some engines still don't."
   :type 'boolean
   :group 'js2-mode)
 
@@ -843,7 +841,7 @@ externs appropriate for the specific file, perhaps based on its path.
 These should go in `js2-additional-externs', which is buffer-local.
 
 Finally, you can add a function to `js2-post-parse-callbacks',
-which is called after parsing completes, and `root' is bound to
+which is called after parsing completes, and `js2-mode-ast' is bound to
 the root of the parse tree.  At this stage you can set up an AST
 node visitor using `js2-visit-ast' and examine the parse tree
 for specific import patterns that may imply the existence of
@@ -1664,7 +1662,7 @@ the correct number of ARGS must be provided."
          "Code has no side effects")
 
 (js2-msg "msg.extra.trailing.comma"
-         "Trailing comma is not legal in an ECMA-262 object initializer")
+         "Trailing comma is not supported in some browsers")
 
 (js2-msg "msg.array.trailing.comma"
          "Trailing comma yields different behavior across browsers")
@@ -7187,6 +7185,7 @@ Scanner should be initialized."
         (push comment (js2-ast-root-comments root))
         (js2-node-add-children root comment)))
     (setf (js2-node-len root) (- end pos))
+    (setq js2-mode-ast root)  ; Make sure this is available for callbacks.
     ;; Give extensions a chance to muck with things before highlighting starts.
     (let ((js2-additional-externs js2-additional-externs))
       (save-excursion
@@ -10448,7 +10447,7 @@ buffer will only rebuild its `js2-mode-ast' if the buffer is dirty."
                     (js2-time
                      (setq interrupted-p
                            (catch 'interrupted
-                             (setq js2-mode-ast (js2-parse))
+                             (js2-parse)
                              ;; if parsing is interrupted, comments and regex
                              ;; literals stay ignored by `parse-partial-sexp'
                              (remove-text-properties (point-min) (point-max)
