@@ -1201,6 +1201,7 @@ prompt for TYPE."
     (insert ?\n ?\n)
     (docbook--print-index type)))
 
+;;;###autoload
 (defun docbook-find-file (filename)
   "Visit FILENAME as a DocBook document."
   (interactive "fView DocBook file: ")
