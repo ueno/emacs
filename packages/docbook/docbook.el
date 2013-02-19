@@ -337,6 +337,89 @@ PARSE-TREE should be a list of the sort returned by
     (dolist (entry (cdr index))
       (setcdr entry (nreverse (cdr entry))))))
 
+;;; Utility functions
+
+(defsubst docbook--node-record (&optional node-id)
+  "Return the record keyed by NODE-ID in `docbook--id-table'.
+If NODE-ID is nil, it defaults to ID of the current page."
+  (gethash (or node-id docbook-current-page) docbook--id-table))
+
+(defsubst docbook-add-fragment-link (id)
+  "If ID is non-nil, add a marker for it to `docbook-id-markers-alist'."
+  (if id (push (cons id (point-marker)) docbook-id-markers-alist)))
+
+(defun docbook--attr (attribute node)
+  "Return the value of attribute ATTRIBUTE in xml node NODE.
+The value is automatically converted to a Lisp symbol.  If the
+node lacks the specified attribute, return nil."
+  (let ((str (cdr (assq attribute (xml-node-attributes node)))))
+    (and (stringp str)
+  	 (not (equal str ""))
+	 (if (equal str "nil") docbook--nil (intern str)))))
+
+(defun docbook--display-string (base-string fallback)
+  "Return a string which displays as BASE-STRING on graphical terminals.
+Use a display property so that on non-graphical terminals, the
+string displays as the FALLBACK string."
+  (propertize base-string
+	      'display `(when (not (display-graphic-p)) . ,fallback)))
+
+(defun docbook--node-text (node)
+  "Return the contents of the DocBook node NODE, as a string."
+  (let ((str (mapconcat
+	      (lambda (x)
+		(cond ((stringp x)
+		       (if (string-match "\\`\\s-+\\'" x) "" x))
+		      ((consp x)
+		       (docbook--node-text x))))
+	      (xml-node-children node)
+	      "")))
+    (if (string-match "\\`\\s-+" str)
+	(setq str (substring str (match-end 0))))
+    (if (string-match "\\s-+\\'" str)
+	(setq str (substring str 0 (match-beginning 0))))
+    str))
+
+(defun docbook--print-block-delimiter ()
+  "Insert newlines for the start or end of a DocBook block element."
+  (cond
+   ((bobp))
+   ((looking-back "\n\n"))
+   ((eq (char-before) ?\n) (insert ?\n))
+   (t (insert "\n\n"))))
+
+(defun docbook--print-string (str &optional literal face)
+  "Insert STR (a string) at point, unless it is useless whitespace.
+If LITERAL is non-nil, preserve whitespace.  If FACE is non-nil,
+apply it as the face for the inserted text."
+  (cond ((or literal (not (string-match "\\`\\s-+\\'" str)))
+	 (insert (propertize str 'font-lock-face face)))
+	((not (or (bolp) (memq (char-before) '(?\s ?\t))))
+	 (insert " "))))
+
+(defun docbook--merge-face (base-face face)
+  "Return a face or list of faces, by merging BASE-FACE and FACE."
+  (cond
+   ((null base-face) face)
+   ((null face)      base-face)
+   ((eq face base-face) base-face)
+   (t
+    (append (if (consp face) face (list face))
+	    (if (consp base-face) base-face (list base-face))))))
+
+(defun docbook--node-face (base-face type &optional parent)
+  "Return a face suitable for displaying DocBook node type TYPE.
+BASE-FACE is the face specified by the node's parent elements.
+If PARENT is non-nil, treat TYPE as the type of the parent node,
+and assume that we are looking up the face of a title node."
+  (let ((face (if parent
+		  (or (cdr (assq type docbook-title-markup-alist))
+		      'docbook-misc-title)
+		(cdr (assq type docbook-text-markup-alist)))))
+    (docbook--merge-face base-face face)))
+
+;;; Parsing the DocBook XML tree
+
 (defun docbook-register-node (node parent-page-id parent-node-id)
   "Register NODE.
 NODE should be a cons cell---a subnode of the tree returned by
@@ -425,87 +508,6 @@ Otherwise, return nil."
       (when (consp subnode)
 	(docbook-register-node subnode parent-page-id id)))
     nil))
-
-;;; Utility functions
-
-(defsubst docbook--node-record (&optional node-id)
-  "Return the record keyed by NODE-ID in `docbook--id-table'.
-If NODE-ID is nil, it defaults to ID of the current page."
-  (gethash (or node-id docbook-current-page) docbook--id-table))
-
-(defsubst docbook-add-fragment-link (id)
-  "If ID is non-nil, add a marker for it to `docbook-id-markers-alist'."
-  (if id (push (cons id (point-marker)) docbook-id-markers-alist)))
-
-(defun docbook--attr (attribute node)
-  "Return the value of attribute ATTRIBUTE in xml node NODE.
-The value is automatically converted to a Lisp symbol.  If the
-node lacks the specified attribute, return nil."
-  (let ((str (cdr (assq attribute (xml-node-attributes node)))))
-    (and (stringp str)
-  	 (not (equal str ""))
-	 (if (equal str "nil") docbook--nil (intern str)))))
-
-(defun docbook--display-string (base-string fallback)
-  "Return a string which displays as BASE-STRING on graphical terminals.
-Use a display property so that on non-graphical terminals, the
-string displays as the FALLBACK string."
-  (propertize base-string
-	      'display `(when (not (display-graphic-p)) . ,fallback)))
-
-(defun docbook--node-text (node)
-  "Return the contents of the DocBook node NODE, as a string."
-  (let ((str (mapconcat
-	      (lambda (x)
-		(cond ((stringp x)
-		       (if (string-match "\\`\\s-+\\'" x) "" x))
-		      ((consp x)
-		       (docbook--node-text x))))
-	      (xml-node-children node)
-	      "")))
-    (if (string-match "\\`\\s-+" str)
-	(setq str (substring str (match-end 0))))
-    (if (string-match "\\s-+\\'" str)
-	(setq str (substring str 0 (match-beginning 0))))
-    str))
-
-(defun docbook--print-block-delimiter ()
-  "Insert newlines for the start or end of a DocBook block element."
-  (cond
-   ((bobp))
-   ((looking-back "\n\n"))
-   ((eq (char-before) ?\n) (insert ?\n))
-   (t (insert "\n\n"))))
-
-(defun docbook--print-string (str &optional literal face)
-  "Insert STR (a string) at point, unless it is useless whitespace.
-If LITERAL is non-nil, preserve whitespace.  If FACE is non-nil,
-apply it as the face for the inserted text."
-  (cond ((or literal (not (string-match "\\`\\s-+\\'" str)))
-	 (insert (propertize str 'font-lock-face face)))
-	((not (or (bolp) (memq (char-before) '(?\s ?\t))))
-	 (insert " "))))
-
-(defun docbook--merge-face (base-face face)
-  "Return a face or list of faces, by merging BASE-FACE and FACE."
-  (cond
-   ((null base-face) face)
-   ((null face)      base-face)
-   ((eq face base-face) base-face)
-   (t
-    (append (if (consp face) face (list face))
-	    (if (consp base-face) base-face (list base-face))))))
-
-(defun docbook--node-face (base-face type &optional parent)
-  "Return a face suitable for displaying DocBook node type TYPE.
-BASE-FACE is the face specified by the node's parent elements.
-If PARENT is non-nil, treat TYPE as the type of the parent node,
-and assume that we are looking up the face of a title node."
-  (let ((face (if parent
-		  (or (cdr (assq type docbook-title-markup-alist))
-		      'docbook-misc-title)
-		(cdr (assq type docbook-text-markup-alist)))))
-    (docbook--merge-face base-face face)))
 
 ;;; Rendering DocBook
 
