@@ -32,6 +32,11 @@
 (require 'ansi-color)
 (autoload 'shell-completion-vars "shell")
 
+(eval-when-compile
+  (unless (fboundp 'setq-local)
+    (defmacro setq-local (var val)
+      (list 'set (list 'make-local-variable (list 'quote var)) val))))
+
 (defgroup ack nil
   "Run `ack' and display the results."
   :group 'tools
@@ -87,6 +92,11 @@ It is called with one arg, the prefix arg to `ack'."
   "A list of regexps to match files in a project root.
 Used by `ack-guess-project-root'."
   :type '(repeat string)
+  :group 'ack)
+
+(defcustom ack-minibuffer-setup-hook nil
+  "Ack-specific hook for `minibuffer-setup-hook'."
+  :type 'hook
   :group 'ack)
 
 ;;; ======== END of USER OPTIONS ========
@@ -191,23 +201,21 @@ This gets tacked on the end of the generated expressions.")
   (when (string-match-p "^[ \t]*hg[ \t]" (car compilation-arguments))
     (setq compilation-error-regexp-alist
           '(("^\\(.+?:[0-9]+:\\)\\(?:\\([0-9]+\\):\\)?" 1 2)))
-    (make-local-variable 'compilation-parse-errors-filename-function)
-    (setq compilation-parse-errors-filename-function
-          (lambda (file)
-            (save-match-data
-              (if (string-match "\\(.+\\):\\([0-9]+\\):" file)
-                  (match-string 1 file)
-                file)))))
+    (setq-local compilation-parse-errors-filename-function
+                (lambda (file)
+                  (save-match-data
+                    (if (string-match "\\(.+\\):\\([0-9]+\\):" file)
+                        (match-string 1 file)
+                      file)))))
   ;; Handle `bzr grep' output
   (when (string-match-p "^[ \t]*bzr[ \t]" (car compilation-arguments))
-    (make-local-variable 'compilation-parse-errors-filename-function)
-    (setq compilation-parse-errors-filename-function
-          (lambda (file)
-            (save-match-data
-              ;; 'bzr grep -r' has files like `termcolor.py~147'
-              (if (string-match "\\(.+\\)~\\([0-9]+\\)" file)
-                  (match-string 1 file)
-                file))))))
+    (setq-local compilation-parse-errors-filename-function
+                (lambda (file)
+                  (save-match-data
+                    ;; 'bzr grep -r' has files like `termcolor.py~147'
+                    (if (string-match "\\(.+\\)~\\([0-9]+\\)" file)
+                        (match-string 1 file)
+                      file))))))
 
 (defun ack-mode-display-match ()
   "Display in another window the match in current line."
@@ -217,18 +225,10 @@ This gets tacked on the end of the generated expressions.")
 
 (define-compilation-mode ack-mode "Ack"
   "A compilation mode tailored for ack."
-  (set (make-local-variable 'compilation-disable-input) t)
-  (set (make-local-variable 'compilation-error-face)
-       'compilation-info)
+  (setq-local compilation-disable-input t)
+  (setq-local compilation-error-face 'compilation-info)
   (add-hook 'compilation-filter-hook 'ack-filter nil t)
   (define-key ack-mode-map "\C-o" #'ack-mode-display-match))
-
-(defun ack-update-minibuffer-prompt (prompt)
-  "Visually replace minibuffer prompt with PROMPT."
-  (when (minibufferp)
-    (let ((inhibit-read-only t))
-      (put-text-property
-       (point-min) (minibuffer-prompt-end) 'display prompt))))
 
 (defun ack-skel-file ()
   "Insert a template for case-insensitive file name search."
@@ -237,7 +237,8 @@ This gets tacked on the end of the generated expressions.")
   (let ((ack (or (car (split-string ack-command nil t)) "ack")))
     (skeleton-insert `(nil ,ack " -g '(?i:" _ ")'"))))
 
-(defvar project-root)                   ; dynamically bound in `ack'
+;; Work around bug http://debbugs.gnu.org/13811
+(defvar ack--project-root nil)          ; dynamically bound in `ack'
 
 (defun ack-skel-vc-grep ()
   "Insert a template for vc grep search."
@@ -251,10 +252,7 @@ This gets tacked on the end of the generated expressions.")
          (backend (downcase (substring which 1)))
          (cmd (or (cdr (assoc which ack-vc-grep-commands))
                   (error "No command provided for `%s grep'" backend))))
-    (setq project-root root)
-    (ack-update-minibuffer-prompt
-     (format "Run %s grep in `%s': " backend
-             (file-name-nondirectory (directory-file-name project-root))))
+    (setq ack--project-root root)
     (delete-minibuffer-contents)
     (skeleton-insert `(nil ,cmd " '" _ "'"))))
 
@@ -302,6 +300,27 @@ Otherwise, interactively choose a directory."
         (ack-default-directory '(16))))
    (t (read-directory-name "In directory: " nil nil t))))
 
+(defun ack-update-minibuffer-prompt (&optional _beg _end _len)
+  (when (minibufferp)
+    (let ((inhibit-read-only t))
+      (save-excursion
+        (goto-char (minibuffer-prompt-end))
+        (when (looking-at "\\(\\w+\\)\\s-")
+          (put-text-property
+           (point-min) (minibuffer-prompt-end)
+           'display
+           (format "Run %s in `%s': "
+                   (match-string-no-properties 1)
+                   (file-name-nondirectory
+                    (directory-file-name ack--project-root)))))))))
+
+(defun ack-minibuffer-setup-function ()
+  (shell-completion-vars)
+  (add-hook 'after-change-functions
+            #'ack-update-minibuffer-prompt nil t)
+  (ack-update-minibuffer-prompt)
+  (run-hooks 'ack-minibuffer-setup-hook))
+
 ;;;###autoload
 (defun ack (command-args &optional directory)
   "Run ack using COMMAND-ARGS and collect output in a buffer.
@@ -313,18 +332,17 @@ minibuffer:
 
 \\{ack-minibuffer-local-map}"
   (interactive
-   (let ((project-root (or (funcall ack-default-directory-function
+   (let ((ack--project-root (or (funcall ack-default-directory-function
                                     current-prefix-arg)
                            default-directory))
          ;; Disable completion cycling; see http://debbugs.gnu.org/12221
          (completion-cycle-threshold nil))
-     (list (minibuffer-with-setup-hook 'shell-completion-vars
-             (read-from-minibuffer
-              (format "Run ack in `%s': "
-                      (file-name-nondirectory
-                       (directory-file-name project-root)))
-              ack-command ack-minibuffer-local-map nil 'ack-history))
-           project-root)))
+     (list (minibuffer-with-setup-hook 'ack-minibuffer-setup-function
+             (read-from-minibuffer "Ack: "
+                                   ack-command
+                                   ack-minibuffer-local-map
+                                   nil 'ack-history))
+           ack--project-root)))
   (let ((default-directory (expand-file-name
                             (or directory default-directory))))
     ;; Change to the compilation buffer so that `ack-buffer-name-function' can
