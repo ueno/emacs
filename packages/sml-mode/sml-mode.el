@@ -3,7 +3,7 @@
 ;; Copyright (C) 1989,1999,2000,2004,2007,2010-2013  Free Software Foundation, Inc.
 
 ;; Maintainer: (Stefan Monnier) <monnier@iro.umontreal.ca>
-;; Version: 6.3
+;; Version: 6.4
 ;; Keywords: SML
 ;; Author:	Lars Bo Nielsen
 ;;		Olin Shivers
@@ -656,7 +656,7 @@ Assumes point is right before the | symbol."
 ;;;; Imenu support
 ;;;;
 
-(defvar sml-imenu-regexp
+(defconst sml-imenu-regexp
   (concat "^[ \t]*\\(let[ \t]+\\)?"
 	  (regexp-opt (append sml-module-head-syms
 			      '("and" "fun" "datatype" "abstype" "type")) t)
@@ -678,9 +678,9 @@ Assumes point is right before the | symbol."
 	      (name (sml-smie-forward-token)))
 	  ;; Eliminate trivial renamings.
 	  (when (or (not (member kind '("structure" "signature")))
-		    (progn (search-forward "=")
-			   (forward-comment (point-max))
-			   (looking-at "sig\\|struct")))
+		    (when (search-forward "=" nil t)
+                      (forward-comment (point-max))
+                      (looking-at "sig\\|struct")))
 	    (push (cons (concat (make-string (/ column 2) ?\ ) name) location)
 		  alist)))))
     alist))
