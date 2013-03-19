@@ -1,6 +1,6 @@
 ;;; company-nxml.el --- A company-mode completion back-end for nxml-mode
 
-;; Copyright (C) 2009-2011  Free Software Foundation, Inc.
+;; Copyright (C) 2009-2011, 2013  Free Software Foundation, Inc.
 
 ;; Author: Nikolaj Schumacher
 
@@ -21,14 +21,23 @@
 
 
 ;;; Commentary:
-;; 
+;;
 
 ;;; Code:
 
 (require 'company)
-(require 'nxml-mode)
-(require 'rng-nxml)
 (eval-when-compile (require 'cl))
+
+(defvar rng-open-elements)
+(defvar rng-validate-mode)
+(defvar rng-in-attribute-regex)
+(defvar rng-in-attribute-value-regex)
+(declare-function rng-set-state-after "rng-nxml")
+(declare-function rng-match-possible-start-tag-names "rng-match")
+(declare-function rng-adjust-state-for-attribute "rng-nxml")
+(declare-function rng-match-possible-attribute-names "rng-match")
+(declare-function rng-adjust-state-for-attribute-value "rng-nxml")
+(declare-function rng-match-possible-value-strings "rng-match")
 
 (defconst company-nxml-token-regexp
   "\\(?:[_[:alpha:]][-._[:alnum:]]*\\_>\\)")
@@ -72,21 +81,21 @@
                  rng-validate-mode
                  (company-grab company-nxml-in-tag-name-regexp 1)))
     (candidates (company-nxml-prepared
-                  (company-nxml-all-completions arg
-                   (rng-match-possible-start-tag-names))))
+                 (company-nxml-all-completions
+                  arg (rng-match-possible-start-tag-names))))
     (sorted t)))
 
 (defun company-nxml-attribute (command &optional arg &rest ignored)
   (case command
     (prefix (and (derived-mode-p 'nxml-mode)
-                  rng-validate-mode
-                  (memq (char-after) '(?\  ?\t ?\n)) ;; outside word
-                  (company-grab rng-in-attribute-regex 1)))
+                 rng-validate-mode
+                 (memq (char-after) '(?\  ?\t ?\n)) ;; outside word
+                 (company-grab rng-in-attribute-regex 1)))
     (candidates (company-nxml-prepared
-                  (and (rng-adjust-state-for-attribute
-                        lt-pos (- (point) (length arg)))
-                       (company-nxml-all-completions arg
-                        (rng-match-possible-attribute-names)))))
+                 (and (rng-adjust-state-for-attribute
+                       lt-pos (- (point) (length arg)))
+                      (company-nxml-all-completions
+                       arg (rng-match-possible-attribute-names)))))
     (sorted t)))
 
 (defun company-nxml-attribute-value (command &optional arg &rest ignored)
@@ -99,16 +108,16 @@
                           (match-string-no-properties 5)
                           ""))))
     (candidates (company-nxml-prepared
-                  (let (attr-start attr-end colon)
-                    (and (looking-back rng-in-attribute-value-regex lt-pos)
-                         (setq colon (match-beginning 2)
-                               attr-start (match-beginning 1)
-                               attr-end (match-end 1))
-                         (rng-adjust-state-for-attribute lt-pos attr-start)
-                         (rng-adjust-state-for-attribute-value
-                          attr-start colon attr-end)
-                         (all-completions arg
-                          (rng-match-possible-value-strings))))))))
+                 (let (attr-start attr-end colon)
+                   (and (looking-back rng-in-attribute-value-regex lt-pos)
+                        (setq colon (match-beginning 2)
+                              attr-start (match-beginning 1)
+                              attr-end (match-end 1))
+                        (rng-adjust-state-for-attribute lt-pos attr-start)
+                        (rng-adjust-state-for-attribute-value
+                         attr-start colon attr-end)
+                        (all-completions
+                         arg (rng-match-possible-value-strings))))))))
 
 ;;;###autoload
 (defun company-nxml (command &optional arg &rest ignored)

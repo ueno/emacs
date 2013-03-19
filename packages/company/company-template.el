@@ -26,7 +26,7 @@
 (defface company-template-field
   '((((background dark)) (:background "yellow" :foreground "black"))
     (((background light)) (:background "orange" :foreground "black")))
-  "*Face used for editable text in template fields."
+  "Face used for editable text in template fields."
   :group 'company)
 
 (defvar company-template-nav-map
@@ -134,5 +134,4 @@
     (remove-hook 'post-command-hook 'company-template-post-command t)))
 
 (provide 'company-template)
-
 ;;; company-template.el ends here

@@ -21,7 +21,7 @@
 
 
 ;;; Commentary:
-;; 
+;;
 
 ;;; Code:
 
@@ -212,14 +212,14 @@
     (espresso-mode . javascript-mode)
     (cperl-mode . perl-mode)
     (jde-mode . java-mode))
-  "*Alist mapping major-modes to sorted keywords for `company-keywords'.")
+  "Alist mapping major-modes to sorted keywords for `company-keywords'.")
 
 ;;;###autoload
 (defun company-keywords (command &optional arg &rest ignored)
   "A `company-mode' back-end for programming language keywords."
   (interactive (list 'interactive))
   (case command
-    (interactive (company-begin-backend 'company-))
+    (interactive (company-begin-backend 'company-keywords))
     (prefix (and (assq major-mode company-keywords-alist)
                  (not (company-in-string-or-comment))
                  (or (company-grab-symbol) 'stop)))
@@ -233,5 +233,3 @@
 
 (provide 'company-keywords)
 ;;; company-keywords.el ends here
-
-

@@ -21,7 +21,9 @@
 
 
 ;;; Commentary:
-;; 
+;;
+;; The main problem with using this backend is installing Pysmell.
+;; I couldn't manage to do that. --Dmitry
 
 ;;; Code:
 

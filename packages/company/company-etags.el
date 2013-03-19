@@ -21,16 +21,15 @@
 
 
 ;;; Commentary:
-;; 
+;;
 
 ;;; Code:
 
 (require 'company)
-(eval-when-compile (require 'etags))
-(eval-when-compile (require 'cl))
+(require 'etags)
 
 (defcustom company-etags-use-main-table-list t
-  "*Always search `tags-table-list' if set.
+  "Always search `tags-table-list' if set.
 If this is disabled, `company-etags' will try to find the one table for each
 buffer automatically."
   :group 'company-mode
@@ -56,6 +55,15 @@ buffer automatically."
           (setq company-etags-buffer-table (company-etags-find-table))
         company-etags-buffer-table)))
 
+(defun company-etags--candidates (prefix)
+  (let ((tags-table-list (company-etags-buffer-table))
+        (completion-ignore-case nil))
+    (and (or tags-file-name tags-table-list)
+         (fboundp 'tags-completion-table)
+         (save-excursion
+           (visit-tags-table-buffer)
+           (all-completions prefix (tags-completion-table))))))
+
 ;;;###autoload
 (defun company-etags (command &optional arg &rest ignored)
   "A `company-mode' completion back-end for etags."
@@ -64,21 +72,14 @@ buffer automatically."
     (interactive (company-begin-backend 'company-etags))
     (prefix (and (memq major-mode company-etags-modes)
                  (not (company-in-string-or-comment))
-                 (require 'etags nil t)
                  (company-etags-buffer-table)
                  (or (company-grab-symbol) 'stop)))
-    (candidates (let ((tags-table-list (company-etags-buffer-table))
-                      (completion-ignore-case nil))
-                  (and (or tags-file-name tags-table-list)
-                       (fboundp 'tags-completion-table)
-                       tags-table-list
-                       (all-completions arg (tags-completion-table)))))
+    (candidates (company-etags--candidates arg))
     (location (let ((tags-table-list (company-etags-buffer-table)))
                 (when (fboundp 'find-tag-noselect)
                   (save-excursion
                     (let ((buffer (find-tag-noselect arg)))
-                      (cons buffer (with-current-buffer buffer (point))))))))
-    (sorted t)))
+                      (cons buffer (with-current-buffer buffer (point))))))))))
 
 (provide 'company-etags)
 ;;; company-etags.el ends here

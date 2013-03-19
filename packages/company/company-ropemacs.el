@@ -1,6 +1,6 @@
 ;;; company-ropemacs.el --- A company-mode completion back-end for pysmell.el
 
-;; Copyright (C) 2009-2011  Free Software Foundation, Inc.
+;; Copyright (C) 2009-2011, 2013  Free Software Foundation, Inc.
 
 ;; Author: Nikolaj Schumacher
 
@@ -21,18 +21,13 @@
 
 
 ;;; Commentary:
-;; 
+;;
+;; Requires pymacs Emacs package (you can get it from Marmalade),
+;; and on Python side: pymacs, rope, ropemacs and ropemode.
 
 ;;; Code:
 
 (eval-when-compile (require 'cl))
-(require 'pymacs)
-
-(unless (fboundp 'rope-completions)
-  (pymacs-load "ropemacs" "rope-"))
-
-(unless (fboundp 'rope-completions)
-  (error "rope-completions not found, try development version of ropemacs"))
 
 (defun company-ropemacs--grab-symbol ()
   (let ((symbol (company-grab-symbol)))
@@ -65,6 +60,10 @@
   "A `company-mode' completion back-end for ropemacs."
   (interactive (list 'interactive))
   (case command
+    (init (when (and (derived-mode-p 'python-mode)
+                     (not (fboundp 'rope-completions)))
+            (require 'pymacs)
+            (pymacs-load "ropemacs" "rope-")))
     (interactive (company-begin-backend 'company-ropemacs))
     (prefix (and (derived-mode-p 'python-mode)
                  (not (company-in-string-or-comment))

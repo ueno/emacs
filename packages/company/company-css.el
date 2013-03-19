@@ -283,10 +283,10 @@ Returns \"\" if no property found, but feasible at this position."
   (case command
     (interactive (company-begin-backend 'company-css))
     (prefix (and (derived-mode-p 'css-mode)
-                  (or (company-grab company-css-tag-regexp 1)
-                      (company-grab company-css-pseudo-regexp 1)
-                      (company-grab company-css-property-value-regexp 2)
-                      (company-css-grab-property))))
+                 (or (company-grab company-css-tag-regexp 1)
+                     (company-grab company-css-pseudo-regexp 1)
+                     (company-grab company-css-property-value-regexp 2)
+                     (company-css-grab-property))))
     (candidates
      (cond
       ((company-grab company-css-tag-regexp 1)

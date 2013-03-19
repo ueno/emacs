@@ -1,6 +1,6 @@
 ;;; company-clang.el --- A company-mode completion back-end for clang
 
-;; Copyright (C) 2009, 2011  Free Software Foundation, Inc.
+;; Copyright (C) 2009, 2011, 2013  Free Software Foundation, Inc.
 
 ;; Author: Nikolaj Schumacher
 
@@ -21,7 +21,7 @@
 
 
 ;;; Commentary:
-;; 
+;;
 
 ;;; Code:
 
@@ -30,19 +30,19 @@
 
 (defcustom company-clang-executable
   (executable-find "clang")
-  "*Location of clang executable."
+  "Location of clang executable."
   :group 'company-clang
   :type 'file)
 
 (defcustom company-clang-auto-save t
-  "*Determines whether to save the buffer when retrieving completions.
+  "Determines whether to save the buffer when retrieving completions.
 clang can only complete correctly when the buffer has been saved."
   :group 'company-clang
   :type '(choice (const :tag "Off" nil)
                  (const :tag "On" t)))
 
 (defcustom company-clang-arguments nil
-  "*Additional arguments to pass to clang when completing.
+  "Additional arguments to pass to clang when completing.
 Prefix files (-include ...) can be selected with
 `company-clang-set-prefix' or automatically through a custom
 `company-clang-prefix-guesser'."
@@ -50,7 +50,7 @@ Prefix files (-include ...) can be selected with
   :type '(repeat (string :tag "Argument" nil)))
 
 (defcustom company-clang-prefix-guesser 'company-clang-guess-prefix
-  "*A function to determine the prefix file for the current buffer."
+  "A function to determine the prefix file for the current buffer."
   :group 'company-clang
   :type '(function :tag "Guesser function" nil))
 
@@ -77,7 +77,7 @@ Prefix files (-include ...) can be selected with
   ;; Prefixes seem to be called .pch.  Pre-compiled headers do, too.
   ;; So we look at the magic number to rule them out.
   (let* ((file (company-clang--guess-pch-file buffer-file-name))
-         (magic-number (company-clang--file-substring file 0 4)))
+         (magic-number (and file (company-clang--file-substring file 0 4))))
     (unless (member magic-number '("CPCH" "gpch"))
       file)))
 
@@ -101,17 +101,24 @@ Prefix files (-include ...) can be selected with
 
 ;; TODO: How to handle OVERLOAD and Pattern?
 (defconst company-clang--completion-pattern
-  "^COMPLETION: \\_<\\(%s[a-zA-Z0-9_:]*\\)")
+  "^COMPLETION: \\_<\\(%s[a-zA-Z0-9_:]*\\)\\(?: : \\(.*\\)$\\)?")
 
 (defconst company-clang--error-buffer-name "*clang error*")
+
+(defvar company-clang--meta-cache nil)
 
 (defun company-clang--parse-output (prefix)
   (goto-char (point-min))
   (let ((pattern (format company-clang--completion-pattern
                          (regexp-quote prefix)))
+        (case-fold-search nil)
         lines match)
+    (setq company-clang--meta-cache (make-hash-table :test 'equal))
     (while (re-search-forward pattern nil t)
       (setq match (match-string-no-properties 1))
+      (let ((meta (match-string-no-properties 2)))
+        (when (and meta (not (string= match meta)))
+          (puthash match meta company-clang--meta-cache)))
       (unless (equal match "Pattern")
         (push match lines)))
     lines))
@@ -153,7 +160,7 @@ Prefix files (-include ...) can be selected with
             (1+ (current-column)))))
 
 (defsubst company-clang--build-complete-args (pos)
-  (append '("-cc1" "-fsyntax-only")
+  (append '("-cc1" "-fsyntax-only" "-code-completion-macros")
           company-clang-arguments
           (when (stringp company-clang--prefix)
             (list "-include" (expand-file-name company-clang--prefix)))
@@ -181,8 +188,9 @@ Prefix files (-include ...) can be selected with
   (with-temp-buffer
     (call-process company-clang-executable nil t nil "--version")
     (goto-char (point-min))
-    (when (re-search-forward "\\`clang version \\([0-9.]+\\)" nil t)
-      (match-string-no-properties 1))))
+    (if (re-search-forward "clang version \\([0-9.]+\\)" nil t)
+        (match-string-no-properties 1)
+      "0")))
 
 (defun company-clang-objc-templatify (selector)
   (let* ((end (point))
@@ -223,6 +231,12 @@ Completions only work correctly when the buffer has been saved.
                  (not (company-in-string-or-comment))
                  (or (company-grab-symbol) 'stop)))
     (candidates (company-clang--candidates arg))
+    (meta (let ((meta (gethash arg company-clang--meta-cache)))
+            (when meta
+              (replace-regexp-in-string
+               "#]" " "
+               (replace-regexp-in-string "[<{[]#\\|#[>}]" "" meta t)
+               t))))
     (post-completion (and (derived-mode-p 'objc-mode)
                           (string-match ":" arg)
                           (company-clang-objc-templatify arg)))))

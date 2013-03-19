@@ -1,6 +1,6 @@
 ;;; company-elisp.el --- A company-mode completion back-end for emacs-lisp-mode
 
-;; Copyright (C) 2009, 2011  Free Software Foundation, Inc.
+;; Copyright (C) 2009, 2011-2012  Free Software Foundation, Inc.
 
 ;; Author: Nikolaj Schumacher
 
@@ -21,7 +21,7 @@
 
 
 ;;; Commentary:
-;; 
+;;
 
 ;;; Code:
 
@@ -30,7 +30,7 @@
 (require 'help-mode)
 
 (defcustom company-elisp-detect-function-context t
-  "*If enabled, offer Lisp functions only in appropriate contexts.
+  "If enabled, offer Lisp functions only in appropriate contexts.
 Functions are offered for completion only after ' and \(."
   :group 'company
   :type '(choice (const :tag "Off" nil)
@@ -46,7 +46,9 @@ Functions are offered for completion only after ' and \(."
 
 (defun company-elisp-predicate (symbol)
   (or (boundp symbol)
-      (fboundp symbol)))
+      (fboundp symbol)
+      (facep symbol)
+      (featurep symbol)))
 
 (defvar company-elisp-parse-limit 30)
 (defvar company-elisp-parse-depth 100)
@@ -124,13 +126,22 @@ Functions are offered for completion only after ' and \(."
     (meta (company-elisp-doc arg))
     (doc-buffer (let ((symbol (intern arg)))
                   (save-window-excursion
-                    (when (or (ignore-errors (describe-function symbol))
-                              (ignore-errors (describe-variable symbol)))
+                    (ignore-errors
+                      (cond
+                       ((fboundp symbol) (describe-function symbol))
+                       ((boundp symbol) (describe-variable symbol))
+                       ((featurep symbol) (describe-package symbol))
+                       ((facep symbol) (describe-face symbol))
+                       (t (signal 'user-error nil)))
                       (help-buffer)))))
     (location (let ((sym (intern arg)))
-                (or (ignore-errors (find-definition-noselect sym nil))
-                    (ignore-errors (find-definition-noselect sym 'defvar))
-                    (ignore-errors (find-definition-noselect sym t)))))))
+                (cond
+                 ((fboundp sym) (find-definition-noselect sym nil))
+                 ((boundp sym) (find-definition-noselect sym 'defvar))
+                 ((featurep sym) (cons (find-file-noselect (find-library-name
+                                                            (symbol-name sym)))
+                                       0))
+                 ((facep sym) (find-definition-noselect sym 'defface)))))))
 
 (provide 'company-elisp)
 ;;; company-elisp.el ends here
