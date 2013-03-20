@@ -12,7 +12,7 @@ esac
 copyright_notices () {
     find . -name '*.el' -print0 |
         xargs -0 grep -L 'Free Software Foundation, Inc' |
-        grep -v '.-\(pkg\|autoloads\)\.el$'
+        grep -v '\(\.dir-locals\|.-\(pkg\|autoloads\)\)\.el$'
 
     find . -name '*.el' -print |
         while read f; do
