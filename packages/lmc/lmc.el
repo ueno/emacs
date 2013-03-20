@@ -1,9 +1,9 @@
 ;;; lmc.el --- Little Man Computer in Elisp
 
-;; Copyright (C) 2011  Free Software Foundation, Inc.
+;; Copyright (C) 2011, 2013  Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
-;; Version: 1.0
+;; Version: 1.1
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -540,22 +540,21 @@
     (lmc-addr->point addr)
     (if (not (re-search-forward "\t.*\t\\(.*\\)$" (line-end-position) t))
         (error "Missing memory cell %S" addr)
-      (when lmc-store-flash
-        (lmc--with-silent-modifications
-          (put-text-property (match-beginning 1) (point)
-                             'face 'region))
-        (sit-for 0.2))
-      (replace-match (format "  %03d" word) t t nil 1)
-      (when lmc-store-flash
-        (sit-for 0.1)
-        (lmc--with-silent-modifications
-          (put-text-property (match-beginning 1) (point)
-                             'face 'region))
-        (sit-for 0.1)
-        (lmc--with-silent-modifications
-          (put-text-property (match-beginning 1) (point)
-                             'face nil))
-        (sit-for 0.1)))))
+      (let ((mb1 (match-beginning 1)))
+        (when lmc-store-flash
+          (lmc--with-silent-modifications
+           (put-text-property mb1 (point) 'face 'region))
+          (sit-for 0.2))
+        (let ((me1 (point)))
+          (insert (format "  %03d" word)) (delete-region mb1 me1))
+        (when lmc-store-flash
+          (sit-for 0.1)
+          (lmc--with-silent-modifications
+           (put-text-property mb1 (point) 'face 'region))
+          (sit-for 0.1)
+          (lmc--with-silent-modifications
+           (put-text-property mb1 (point) 'face nil))
+          (sit-for 0.1))))))
 
 (defun lmc-step ()
   "Execute one LMC instruction."
