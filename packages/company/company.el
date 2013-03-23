@@ -4,7 +4,7 @@
 
 ;; Author: Nikolaj Schumacher
 ;; Maintainer: Dmitry Gutov <dgutov@yandex.ru>
-;; Version: 0.6
+;; Version: 0.6.1
 ;; Keywords: abbrev, convenience, matching
 ;; URL: http://company-mode.github.com/
 ;; Compatibility: GNU Emacs 22.x, GNU Emacs 23.x, GNU Emacs 24.x
@@ -65,93 +65,7 @@
 ;;
 ;;; Change Log:
 ;;
-;; 2013-03-19 (0.6)
-;;    Switching between tag files now works correctly with `company-etags'.
-;;    Clang completions now include macros and are case-sensitive.
-;;    Added `company-capf': completion adapter using
-;;    `completion-at-point-functions'.  (Stefan Monnier)
-;;    `company-elisp' has some improvements.
-;;    Instead of `overrriding-terminal-local-map', we're now using
-;;    `emulation-mode-map-alists' (experimental).  This largely means that when
-;;    the completion keymap is active, other minor modes' keymaps are still
-;;    used, so, for example, it's not as easy to circumvent `paredit-mode'
-;;    accidentally when it's enabled.
-;;    Fixed two old tooltip annoyances.
-;;    Some performance improvements.
-;;    `company-clang' now shows meta information, too.
-;;    Candidates from grouped back-ends are merged more conservatively: only
-;;    back-ends that return the same prefix at point are used.
-;;    Loading of `nxml', `semantic', `pymacs' and `ropemacs' is now deferred.
-;;    `company-pysmell' is not used by default anymore.
-;;    Across-the-board bugfixing.
-;;
-;; 2010-02-24 (0.5)
-;;    `company-ropemacs' now provides location and docs.  (Fernando H. Silva)
-;;    Added `company-with-candidate-inserted' macro.
-;;    Added `company-clang' back-end.
-;;    Added new mechanism for non-consecutive insertion.
-;;      (So far only used by clang for ObjC.)
-;;    The semantic back-end now shows meta information for local symbols.
-;;    Added compatibility for CEDET in Emacs 23.2 and from CVS.  (Oleg Andreev)
-;;
-;; 2009-05-07 (0.4.3)
-;;    Added `company-other-backend'.
-;;    Idle completion no longer interrupts multi-key command input.
-;;    Added `company-ropemacs' and `company-pysmell' back-ends.
-;;
-;; 2009-04-25 (0.4.2)
-;;    In C modes . and -> now count towards `company-minimum-prefix-length'.
-;;    Reverted default front-end back to `company-preview-if-just-one-frontend'.
-;;    The pseudo tooltip will no longer be clipped at the right window edge.
-;;    Added `company-tooltip-minimum'.
-;;    Windows compatibility fixes.
-;;
-;; 2009-04-19 (0.4.1)
-;;    Added `global-company-mode'.
-;;    Performance enhancements.
-;;    Added `company-eclim' back-end.
-;;    Added safer workaround for Emacs `posn-col-row' bug.
-;;
-;; 2009-04-18 (0.4)
-;;    Automatic completion is now aborted if the prefix gets too short.
-;;    Added option `company-dabbrev-time-limit'.
-;;    `company-backends' now supports merging back-ends.
-;;    Added back-end `company-dabbrev-code' for generic code.
-;;    Fixed `company-begin-with'.
-;;
-;; 2009-04-15 (0.3.1)
-;;    Added 'stop prefix to prevent dabbrev from completing inside of symbols.
-;;    Fixed issues with tabbar-mode and line-spacing.
-;;    Performance enhancements.
-;;
-;; 2009-04-12 (0.3)
-;;    Added `company-begin-commands' option.
-;;    Added abbrev, tempo and Xcode back-ends.
-;;    Back-ends are now interactive.  You can start them with M-x backend-name.
-;;    Added `company-begin-with' for starting company from elisp-code.
-;;    Added hooks.
-;;    Added `company-require-match' and `company-auto-complete' options.
-;;
-;; 2009-04-05 (0.2.1)
-;;    Improved Emacs Lisp back-end behavior for local variables.
-;;    Added `company-elisp-detect-function-context' option.
-;;    The mouse can now be used for selection.
-;;
-;; 2009-03-22 (0.2)
-;;    Added `company-show-location'.
-;;    Added etags back-end.
-;;    Added work-around for end-of-buffer bug.
-;;    Added `company-filter-candidates'.
-;;    More local Lisp variables are now included in the candidates.
-;;
-;; 2009-03-21 (0.1.5)
-;;    Fixed elisp documentation buffer always showing the same doc.
-;;    Added `company-echo-strip-common-frontend'.
-;;    Added `company-show-numbers' option and M-0 ... M-9 default bindings.
-;;    Don't hide the echo message if it isn't shown.
-;;
-;; 2009-03-20 (0.1)
-;;    Initial release.
+;; See NEWS.md in the repository.
 
 ;;; Code:
 
@@ -406,6 +320,14 @@ not offering as a candidate.  Use with care!  The default value nil gives the
 user that choice with `company-require-match'.  Return value 'never overrides
 that option the other way around.
 
+`init': Called once for each buffer, the back-end can check for external
+programs and files and load any required libraries.  Raising an error here will
+show up in message log once, and the backend will not be used for completion.
+
+`post-completion': Called after a completion candidate has been inserted into
+the buffer.  The second argument is the candidate.  Can be used to modify it,
+e.g. to expand a snippet.
+
 The back-end should return nil for all commands it does not support or
 does not know about.  It should also be callable interactively and use
 `company-begin-backend' to start itself in that case."
@@ -544,8 +466,8 @@ The work-around consists of adding a newline.")
     (define-key keymap "\C-g" 'company-abort)
     (define-key keymap (kbd "M-n") 'company-select-next)
     (define-key keymap (kbd "M-p") 'company-select-previous)
-    (define-key keymap (kbd "<down>") 'company-select-next)
-    (define-key keymap (kbd "<up>") 'company-select-previous)
+    (define-key keymap (kbd "<down>") 'company-select-next-or-abort)
+    (define-key keymap (kbd "<up>") 'company-select-previous-or-abort)
     (define-key keymap [down-mouse-1] 'ignore)
     (define-key keymap [down-mouse-3] 'ignore)
     (define-key keymap [mouse-1] 'company-complete-mouse)
@@ -733,14 +655,16 @@ keymap during active completions (`company-active-map'):
     (apply 'company--multi-backend-adapter company-backend args)))
 
 (defun company--multi-backend-adapter (backends command &rest args)
-  (let ((backends (remove-if (lambda (b) (eq 'failed (get b 'company-init)))
+  (let ((backends (remove-if (lambda (b)
+                               (and (symbolp b)
+                                    (eq 'failed (get b 'company-init))))
                              backends)))
     (case command
       (candidates
        (loop for backend in backends
              when (equal (funcall backend 'prefix)
                          (car args))
-             nconc (apply backend 'candidates args)))
+             append (apply backend 'candidates args)))
       (sorted nil)
       (duplicates t)
       (otherwise
@@ -781,6 +705,10 @@ keymap during active completions (`company-active-map'):
 (defvar company--explicit-action nil
   "Non-nil, if explicit completion took place.")
 (make-variable-buffer-local 'company--explicit-action)
+
+(defvar company--auto-completion nil
+  "Non-nil when current candidate is being completed automatically.
+Controlled by `company-auto-complete'.")
 
 (defvar company--point-max nil)
 (make-variable-buffer-local 'company--point-max)
@@ -873,9 +801,14 @@ can retrieve meta-data for them."
   (push (cons company-prefix company-candidates) company-candidates-cache)
   ;; Calculate common.
   (let ((completion-ignore-case (company-call-backend 'ignore-case)))
-    (setq company-common (try-completion company-prefix company-candidates)))
+    (setq company-common (company--safe-candidate
+                          (try-completion company-prefix company-candidates))))
   (when (eq company-common t)
     (setq company-candidates nil)))
+
+(defun company--safe-candidate (str)
+  (or (company-call-backend 'crop str)
+      str))
 
 (defun company-calculate-candidates (prefix)
   (let ((candidates (cdr (assoc prefix company-candidates-cache)))
@@ -909,9 +842,9 @@ can retrieve meta-data for them."
              (or (cdr candidates)
                  (not (eq t (compare-strings (car candidates) nil nil
                                              prefix nil nil ignore-case)))))
-        ;; Don't start when already completed and unique.
         candidates
-      ;; Not the right place? maybe when setting?
+      ;; Already completed and unique; don't start.
+      ;; FIXME: Not the right place? maybe when setting?
       (and company-candidates t))))
 
 (defun company-idle-begin (buf win tick pos)
@@ -1006,7 +939,8 @@ can retrieve meta-data for them."
         ;; auto-complete
         (save-excursion
           (goto-char company-point)
-          (company-complete-selection)
+          (let ((company--auto-completion t))
+            (company-complete-selection))
           nil))
        ((and (company--string-incremental-p company-prefix new-prefix)
              (company-require-match-p))
@@ -1022,8 +956,9 @@ can retrieve meta-data for them."
 
 (defun company--good-prefix-p (prefix)
   (and (or (company-explicit-action-p)
-           (>= (or (cdr-safe prefix) (length prefix))
-               company-minimum-prefix-length))
+           (unless (eq prefix 'stop)
+             (>= (or (cdr-safe prefix) (length prefix))
+                 company-minimum-prefix-length)))
        (stringp (or (car-safe prefix) prefix))))
 
 (defun company--continue ()
@@ -1277,9 +1212,7 @@ can retrieve meta-data for them."
   (interactive)
   (company-search-assert-enabled)
   (company-search-mode 0)
-  (when last-input-event
-    (clear-this-command-keys t)
-    (setq unread-command-events (list last-input-event))))
+  (company--unread-last-input))
 
 (defvar company-search-map
   (let ((i 0)
@@ -1288,7 +1221,7 @@ can retrieve meta-data for them."
         (set-char-table-range (nth 1 keymap) (cons #x100 (max-char))
                               'company-search-printing-char)
       (with-no-warnings
-        ;; obselete in Emacs 23
+        ;; obsolete in Emacs 23
         (let ((l (generic-character-list))
               (table (nth 1 keymap)))
           (while l
@@ -1383,6 +1316,24 @@ followed by `company-search-kill-others' after each input."
   (when (company-manual-begin)
     (company-set-selection (1- company-selection))))
 
+(defun company-select-next-or-abort ()
+  "Select the next candidate if more than one, else abort
+and invoke the normal binding."
+  (interactive)
+  (if (> company-candidates-length 1)
+      (company-select-next)
+    (company-abort)
+    (company--unread-last-input)))
+
+(defun company-select-previous-or-abort ()
+  "Select the previous candidate if more than one, else abort
+and invoke the normal binding."
+  (interactive)
+  (if (> company-candidates-length 1)
+      (company-select-previous)
+    (company-abort)
+    (company--unread-last-input)))
+
 (defun company-select-mouse (event)
   "Select the candidate picked by the mouse."
   (interactive "e")
@@ -1402,7 +1353,10 @@ followed by `company-search-kill-others' after each input."
   "Complete the selected candidate."
   (interactive)
   (when (company-manual-begin)
-    (company-finish (nth company-selection company-candidates))))
+    (let ((result (nth company-selection company-candidates)))
+      (when company--auto-completion
+        (setq result (company--safe-candidate result)))
+      (company-finish result))))
 
 (defun company-complete-common ()
   "Complete the common part of all candidates."
@@ -1501,9 +1455,12 @@ To show the number next to the candidates in some back-ends, enable
          (while (memq (setq cmd (key-binding (vector (list (read-event)))))
                       company--electric-commands)
            (call-interactively cmd))
-         (when last-input-event
-           (clear-this-command-keys t)
-           (setq unread-command-events (list last-input-event)))))))
+         (company--unread-last-input)))))
+
+(defun company--unread-last-input ()
+  (when last-input-event
+    (clear-this-command-keys t)
+    (setq unread-command-events (list last-input-event))))
 
 (defun company-show-doc-buffer ()
   "Temporarily show a buffer with the complete documentation for the selection."
@@ -1565,7 +1522,9 @@ To show the number next to the candidates in some back-ends, enable
   (setq company-backend backend)
   ;; Return non-nil if active.
   (or (company-manual-begin)
-      (error "Cannot complete at point")))
+      (progn
+        (setq company-backend nil)
+        (error "Cannot complete at point"))))
 
 (defun company-begin-with (candidates
                            &optional prefix-length require-match callback)
@@ -1819,8 +1778,7 @@ Returns a negative number if the tooltip should be displayed above point."
                             args))
 
         (overlay-put ov 'company-column column)
-        (overlay-put ov 'company-height (abs height))
-        (overlay-put ov 'window (selected-window))))))
+        (overlay-put ov 'company-height (abs height))))))
 
 (defun company-pseudo-tooltip-show-at-point (pos)
   (let ((col-row (company--col-row pos)))

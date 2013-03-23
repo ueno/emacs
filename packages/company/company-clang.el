@@ -181,34 +181,42 @@ Prefix files (-include ...) can be selected with
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defconst company-clang-required-version "1.1")
+(defconst company-clang-required-version 1.1)
 
 (defsubst company-clang-version ()
   "Return the version of `company-clang-executable'."
   (with-temp-buffer
     (call-process company-clang-executable nil t nil "--version")
     (goto-char (point-min))
-    (if (re-search-forward "clang version \\([0-9.]+\\)" nil t)
-        (match-string-no-properties 1)
-      "0")))
+    (if (re-search-forward "clang\\(?: version \\|-\\)\\([0-9.]+\\)" nil t)
+        (let ((ver (string-to-number (match-string-no-properties 1))))
+          (if (> ver 100)
+              (/ ver 100)
+            ver))
+      0)))
 
 (defun company-clang-objc-templatify (selector)
   (let* ((end (point))
          (beg (- (point) (length selector)))
-         (templ (company-template-declare-template beg end)))
+         (templ (company-template-declare-template beg end))
+         (cnt 0))
     (save-excursion
       (goto-char beg)
       (while (search-forward ":" end t)
-        (replace-match ":  ")
-        (incf end 2)
-        (company-template-add-field templ (1- (match-end 0)) "<arg>"))
-      (delete-char -1))
+        (let* ((name (format "arg%d" cnt))
+               (len (length name)))
+          (incf end len)
+          (company-template-add-field templ (match-end 0) name)
+          (goto-char (+ (match-end 0) len))
+          (when (< (point) end)
+            (insert " ")
+            (incf end))
+          (incf cnt))))
     (company-template-move-to-first templ)))
 
 (defun company-clang (command &optional arg &rest ignored)
   "A `company-mode' completion back-end for clang.
-Clang is a parser for C and ObjC.  The unreleased development version of
-clang (1.1) is required.
+Clang is a parser for C and ObjC.  Clang version 1.1 or newer is required.
 
 Additional command line arguments can be specified in
 `company-clang-arguments'.  Prefix files (-include ...) can be selected
@@ -220,11 +228,11 @@ Completions only work correctly when the buffer has been saved.
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-clang))
-    (init (unless company-clang-executable
-            (error "Company found no clang executable"))
-          (when (version< (company-clang-version)
-                          company-clang-required-version)
-            (error "Company requires clang version 1.1")))
+    (init (when (memq major-mode company-clang-modes)
+            (unless company-clang-executable
+              (error "Company found no clang executable"))
+            (when (< (company-clang-version) company-clang-required-version)
+              (error "Company requires clang version 1.1"))))
     (prefix (and (memq major-mode company-clang-modes)
                  buffer-file-name
                  company-clang-executable
@@ -237,6 +245,9 @@ Completions only work correctly when the buffer has been saved.
                "#]" " "
                (replace-regexp-in-string "[<{[]#\\|#[>}]" "" meta t)
                t))))
+    (crop (and (derived-mode-p 'objc-mode)
+               (string-match ":" arg)
+               (substring arg 0 (match-beginning 0))))
     (post-completion (and (derived-mode-p 'objc-mode)
                           (string-match ":" arg)
                           (company-clang-objc-templatify arg)))))

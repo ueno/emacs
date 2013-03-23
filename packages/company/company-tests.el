@@ -1,6 +1,6 @@
 ;;; company-tests.el --- company-mode tests
 
-;; Copyright (C) 2011  Free Software Foundation, Inc.
+;; Copyright (C) 2011, 2013  Free Software Foundation, Inc.
 
 ;; Author: Nikolaj Schumacher
 
@@ -29,7 +29,7 @@
 (require 'company)
 (require 'company-keywords)
 
-(ert-deftest sorted-keywords ()
+(ert-deftest company-sorted-keywords ()
   "Test that keywords in `company-keywords-alist' are in alphabetical order."
   (dolist (pair company-keywords-alist)
     (when (consp (cdr pair))
@@ -38,3 +38,39 @@
           (should (not (equal prev next)))
           (should (string< prev next))
           (setq prev next))))))
+
+(ert-deftest company-good-prefix ()
+  (let ((company-minimum-prefix-length 5)
+        company--explicit-action)
+    (should (eq t (company--good-prefix-p "!@#$%")))
+    (should (eq nil (company--good-prefix-p "abcd")))
+    (should (eq nil (company--good-prefix-p 'stop)))
+    (should (eq t (company--good-prefix-p '("foo" . 5))))
+    (should (eq nil (company--good-prefix-p '("foo" . 4))))))
+
+(ert-deftest company-multi-backend-with-lambdas ()
+  (let ((company-backend
+         (list (lambda (command &optional arg &rest ignore)
+                 (case command
+                   (prefix "z")
+                   (candidates '("a" "b"))))
+               (lambda (command &optional arg &rest ignore)
+                 (case command
+                   (prefix "z")
+                   (candidates '("c" "d")))))))
+    (should (equal (company-call-backend 'candidates "z") '("a" "b" "c" "d")))))
+
+(ert-deftest company-begin-backend-failure-doesnt-break-company-backends ()
+  (with-temp-buffer
+    (insert "a")
+    (company-mode)
+    (should-error
+     (company-begin-backend (lambda (command &rest ignore))))
+    (let ((company-backends
+           (list (lambda (command &optional arg)
+                   (case command
+                     (prefix "a")
+                     (candidates '("a" "ab" "ac")))))))
+      (company-complete)
+      (setq this-command 'company-complete)
+      (should (eq 3 company-candidates-length)))))
