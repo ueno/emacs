@@ -4,7 +4,7 @@
 
 ;; Author: Nikolaj Schumacher
 ;; Maintainer: Dmitry Gutov <dgutov@yandex.ru>
-;; Version: 0.6.1
+;; Version: 0.6.2
 ;; Keywords: abbrev, convenience, matching
 ;; URL: http://company-mode.github.com/
 ;; Compatibility: GNU Emacs 22.x, GNU Emacs 23.x, GNU Emacs 24.x
@@ -550,9 +550,12 @@ keymap during active completions (`company-active-map'):
     (company-cancel)
     (kill-local-variable 'company-point)))
 
-(define-globalized-minor-mode global-company-mode company-mode
-  (lambda () (unless (or noninteractive (eq (aref (buffer-name) 0) ?\s))
-          (company-mode 1))))
+;;;###autoload
+(define-globalized-minor-mode global-company-mode company-mode company-mode-on)
+
+(defun company-mode-on ()
+  (unless (or noninteractive (eq (aref (buffer-name) 0) ?\s))
+    (company-mode 1)))
 
 (defsubst company-assert-enabled ()
   (unless company-mode
@@ -655,10 +658,10 @@ keymap during active completions (`company-active-map'):
     (apply 'company--multi-backend-adapter company-backend args)))
 
 (defun company--multi-backend-adapter (backends command &rest args)
-  (let ((backends (remove-if (lambda (b)
-                               (and (symbolp b)
-                                    (eq 'failed (get b 'company-init))))
-                             backends)))
+  (let ((backends (loop for b in backends
+                        when (not (and (symbolp b)
+                                       (eq 'failed (get b 'company-init))))
+                        collect b)))
     (case command
       (candidates
        (loop for backend in backends
@@ -1998,10 +2001,6 @@ Returns a negative number if the tooltip should be displayed above point."
   (case command
     (post-command (company-echo-show-when-idle 'company-fetch-metadata))
     (hide (company-echo-hide))))
-
-;; templates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(autoload 'company-template-declare-template "company-template")
 
 (provide 'company)
 ;;; company.el ends here
