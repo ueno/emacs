@@ -84,12 +84,15 @@ latest="emacs-packages-latest.tgz"
      # Actually, let's never overwrite an existing version.  So changes can
      # be installed without causing a new package to be built until the
      # version field is changed.  Some files need to be excluded from the
-     # "immutable" policy, most importantly "archive-contents".
-     if [ -r "$dst" ] &&
-        [ ! "archive-contents" = "$(basename "$dst")" ]
-     then rm "$f"
-     else mv "$f" "$dst"
-     fi
+     # "immutable" policy, most importantly "archive-contents"
+     # and "*-readme.txt".
+     case $dst in
+         */archive-contents | *-readme.txt ) mv "$f" "$dst" ;;
+         * ) if [ -r "$dst" ]
+             then rm "$f"
+             else mv "$f" "$dst"
+             fi ;;
+     esac
  done
  mv build/archive/"$latest" staging/
  rm -rf build/archive)
