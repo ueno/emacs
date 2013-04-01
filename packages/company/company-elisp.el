@@ -1,6 +1,6 @@
-;;; company-elisp.el --- A company-mode completion back-end for emacs-lisp-mode
+;;; company-elisp.el --- A company-mode completion back-end for emacs-lisp-mode -*- lexical-binding: t -*-
 
-;; Copyright (C) 2009, 2011-2012  Free Software Foundation, Inc.
+;; Copyright (C) 2009, 2011-2013  Free Software Foundation, Inc.
 
 ;; Author: Nikolaj Schumacher
 
@@ -37,76 +37,145 @@ Functions are offered for completion only after ' and \(."
   :type '(choice (const :tag "Off" nil)
                  (const :tag "On" t)))
 
-(defun company-grab-lisp-symbol ()
+(defcustom company-elisp-show-locals-first t
+  "If enabled, locally bound variables and functions are displayed
+first in the candidates list."
+  :group 'company
+  :type '(choice (const :tag "Off" nil)
+                 (const :tag "On" t)))
+
+(defun company-elisp--prefix ()
   (let ((prefix (company-grab-symbol)))
     (if prefix
-        (unless (and (company-in-string-or-comment)
-                     (/= (char-before (- (point) (length prefix))) ?`))
+        (when (if (company-in-string-or-comment)
+                  (= (char-before (- (point) (length prefix))) ?`)
+                (company-elisp--should-complete))
           prefix)
       'stop)))
 
-(defun company-elisp-predicate (symbol)
+(defun company-elisp--predicate (symbol)
   (or (boundp symbol)
       (fboundp symbol)
       (facep symbol)
       (featurep symbol)))
 
+(defun company-elisp--fns-regexp (&rest names)
+  (concat "\\_<\\(?:cl-\\)?" (regexp-opt names) "\\*?\\_>"))
+
 (defvar company-elisp-parse-limit 30)
 (defvar company-elisp-parse-depth 100)
 
-(defvar company-elisp-binding-regexp
-  (concat "([ \t\n]*\\_<" (regexp-opt '("let" "defun" "defmacro" "defsubst"
-                                        "lambda" "lexical-let" "flet" "labels"))
-          "\\*?")
-  "Regular expression matching sexps containing variable bindings.")
+(defvar company-elisp-defun-names '("defun" "defmacro" "defsubst"))
 
-(defvar company-elisp-binding-regexp-1
-  (concat "([ \t\n]*\\_<" (regexp-opt '("dolist" "dotimes")))
-  "Regular expression matching sexps containing one variable binding.")
+(defvar company-elisp-var-binding-regexp
+  (apply #'company-elisp--fns-regexp "let" "lambda" "lexical-let"
+         company-elisp-defun-names)
+  "Regular expression matching head of a multiple variable bindings form.")
 
-(defun company-elisp-parse-local (prefix vars)
+(defvar company-elisp-var-binding-regexp-1
+  (company-elisp--fns-regexp "dolist" "dotimes")
+  "Regular expression matching head of a form with one variable binding.")
+
+(defvar company-elisp-fun-binding-regexp
+  (company-elisp--fns-regexp "flet" "labels")
+  "Regular expression matching head of a function bindings form.")
+
+(defvar company-elisp-defuns-regexp
+  (concat "([ \t\n]*"
+          (apply #'company-elisp--fns-regexp company-elisp-defun-names)))
+
+(defun company-elisp--should-complete ()
+  (let ((start (point))
+        (depth (car (syntax-ppss))))
+    (not
+     (when (> depth 0)
+       (save-excursion
+         (up-list (- depth))
+         (when (looking-at company-elisp-defuns-regexp)
+           (forward-char)
+           (forward-sexp 1)
+           (unless (= (point) start)
+             (condition-case nil
+                 (let ((args-end (scan-sexps (point) 2)))
+                   (or (null args-end)
+                       (> args-end start)))
+               (scan-error
+                t)))))))))
+
+(defun company-elisp--locals (prefix functions-p)
   (let ((regexp (concat "[ \t\n]*\\(\\_<" (regexp-quote prefix)
                         "\\(?:\\sw\\|\\s_\\)*\\_>\\)"))
-        (pos (point)))
-    (ignore-errors
-      (save-excursion
-        (dotimes (i company-elisp-parse-depth)
-          (up-list -1)
-          (save-excursion
-            (cond
-             ((looking-at company-elisp-binding-regexp)
-              (down-list 2)
-              (ignore-errors
-                (dotimes (i company-elisp-parse-limit)
-                  (save-excursion
-                    (when (looking-at "[ \t\n]*(")
-                      (down-list 1))
-                    (and (looking-at regexp)
-                         ;; Don't add incomplete text as candidate.
-                         (not (eq (match-end 0) pos))
-                         (add-to-list 'vars (match-string-no-properties 1))))
-                  (forward-sexp))))
-             ((looking-at company-elisp-binding-regexp-1)
-              (down-list 2)
-              (and (looking-at regexp)
-                   ;; Don't add incomplete text as candidate.
-                   (not (eq (match-end 0) pos))
-                   (add-to-list 'vars (match-string-no-properties 1)))))))))
-    vars))
+        (pos (point))
+        res)
+    (condition-case nil
+        (save-excursion
+          (dotimes (i company-elisp-parse-depth)
+            (up-list -1)
+            (save-excursion
+              (when (eq (char-after) ?\()
+                (forward-char 1)
+                (when (ignore-errors
+                        (save-excursion (forward-list)
+                                        (<= (point) pos)))
+                  (skip-chars-forward " \t\n")
+                  (cond
+                   ((looking-at (if functions-p
+                                    company-elisp-fun-binding-regexp
+                                  company-elisp-var-binding-regexp))
+                    (down-list 1)
+                    (condition-case nil
+                        (dotimes (i company-elisp-parse-limit)
+                          (save-excursion
+                            (when (looking-at "[ \t\n]*(")
+                              (down-list 1))
+                            (when (looking-at regexp)
+                              (pushnew (match-string-no-properties 1) res)))
+                          (forward-sexp))
+                      (scan-error nil)))
+                   ((unless functions-p
+                      (looking-at company-elisp-var-binding-regexp-1))
+                    (down-list 1)
+                    (when (looking-at regexp)
+                      (pushnew (match-string-no-properties 1) res)))))))))
+      (scan-error nil))
+    res))
 
 (defun company-elisp-candidates (prefix)
-  (let* ((completion-ignore-case nil)
-         (before (char-before (- (point) (length prefix))))
-         (predicate (if (and company-elisp-detect-function-context
-                             (not (eq before ?')))
-                        (if (eq before ?\()
-                            'fboundp
-                          'boundp)
-                      'company-elisp-predicate))
-         (candidates (all-completions prefix obarray predicate)))
-    (company-elisp-parse-local prefix candidates)))
+  (let* ((predicate (company-elisp--candidates-predicate prefix))
+         (locals (company-elisp--locals prefix (eq predicate 'fboundp)))
+         (globals (company-elisp--globals prefix predicate))
+         (locals (loop for local in locals
+                       when (not (member local globals))
+                       collect local)))
+    (if company-elisp-show-locals-first
+        (append (sort locals 'string<)
+                (sort globals 'string<))
+      (append locals globals))))
 
-(defun company-elisp-doc (symbol)
+(defun company-elisp--globals (prefix predicate)
+  (all-completions prefix obarray predicate))
+
+(defun company-elisp--candidates-predicate (prefix)
+  (let* ((completion-ignore-case nil)
+         (before (char-before (- (point) (length prefix)))))
+    (if (and company-elisp-detect-function-context
+             (not (eq before ?')))
+        (if (and (eq before ?\()
+                 (not
+                  (save-excursion
+                    (ignore-errors
+                      (up-list -2)
+                      (and (save-excursion
+                             (forward-char 1)
+                             (looking-at "[ \t\n]*("))
+                           (prog1 (search-backward "(")
+                             (forward-char 1))
+                           (looking-at company-elisp-var-binding-regexp))))))
+            'fboundp
+          'boundp)
+      'company-elisp--predicate)))
+
+(defun company-elisp--doc (symbol)
   (let* ((symbol (intern symbol))
          (doc (if (fboundp symbol)
                   (documentation symbol t)
@@ -122,9 +191,10 @@ Functions are offered for completion only after ' and \(."
   (case command
     (interactive (company-begin-backend 'company-elisp))
     (prefix (and (eq (derived-mode-p 'emacs-lisp-mode) 'emacs-lisp-mode)
-                 (company-grab-lisp-symbol)))
+                 (company-elisp--prefix)))
     (candidates (company-elisp-candidates arg))
-    (meta (company-elisp-doc arg))
+    (sorted company-elisp-show-locals-first)
+    (meta (company-elisp--doc arg))
     (doc-buffer (let ((symbol (intern arg)))
                   (save-window-excursion
                     (ignore-errors

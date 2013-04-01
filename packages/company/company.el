@@ -1,10 +1,10 @@
-;;; company.el --- Modular in-buffer completion framework
+;;; company.el --- Modular in-buffer completion framework  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2009-2013  Free Software Foundation, Inc.
 
 ;; Author: Nikolaj Schumacher
 ;; Maintainer: Dmitry Gutov <dgutov@yandex.ru>
-;; Version: 0.6.2
+;; Version: 0.6.6
 ;; Keywords: abbrev, convenience, matching
 ;; URL: http://company-mode.github.com/
 ;; Compatibility: GNU Emacs 22.x, GNU Emacs 23.x, GNU Emacs 24.x
@@ -86,14 +86,20 @@
   :group 'matching)
 
 (defface company-tooltip
-  '((t :background "yellow"
-       :foreground "black"))
+  '((default :foreground "black")
+    (((class color) (min-colors 88) (background light))
+     (:background "cornsilk"))
+    (((class color) (min-colors 88) (background dark))
+     (:background "yellow")))
   "Face used for the tool tip."
   :group 'company)
 
 (defface company-tooltip-selection
   '((default :inherit company-tooltip)
-    (((class color) (min-colors 88)) (:background "orange1"))
+    (((class color) (min-colors 88) (background light))
+     (:background "light blue"))
+    (((class color) (min-colors 88) (background dark))
+     (:background "orange1"))
     (t (:background "green")))
   "Face used for the selection in the tool tip."
   :group 'company)
@@ -104,14 +110,20 @@
   :group 'company)
 
 (defface company-tooltip-common
-  '((t :inherit company-tooltip
-       :foreground "red"))
+  '((default :inherit company-tooltip)
+    (((background light))
+     :foreground "darkred")
+    (((background dark))
+     :foreground "red"))
   "Face used for the common completion in the tool tip."
   :group 'company)
 
 (defface company-tooltip-common-selection
-  '((t :inherit company-tooltip-selection
-       :foreground "red"))
+  '((default :inherit company-tooltip-selection)
+    (((background light))
+     :foreground "darkred")
+    (((background dark))
+     :foreground "red"))
   "Face used for the selected common completion in the tool tip."
   :group 'company)
 
@@ -316,7 +328,7 @@ return the cons of buffer and buffer location, or of file and line
 number where the completion candidate was defined.
 
 `require-match': If this value is t, the user is not allowed to enter anything
-not offering as a candidate.  Use with care!  The default value nil gives the
+not offered as a candidate.  Use with care!  The default value nil gives the
 user that choice with `company-require-match'.  Return value 'never overrides
 that option the other way around.
 
@@ -363,7 +375,10 @@ aborted manually."
 
 (defcustom company-completion-finished-hook nil
   "Hook run when company successfully completes.
-The hook is called with the selected candidate as an argument."
+The hook is called with the selected candidate as an argument.
+
+If you indend to use it to post-process candidates from a specific back-end,
+consider using the `post-completion' command instead."
   :group 'company
   :type 'hook)
 
@@ -405,7 +420,7 @@ completion.  If it is a list of syntax description characters (see
 This can also be a function, which is called with the new input and should
 return non-nil if company should auto-complete.
 
-A character that is part of a valid candidate never starts auto-completion."
+A character that is part of a valid candidate never triggers auto-completion."
   :group 'company
   :type '(choice (string :tag "Characters")
                  (set :tag "Syntax"
@@ -475,7 +490,9 @@ The work-around consists of adding a newline.")
     (define-key keymap [up-mouse-1] 'ignore)
     (define-key keymap [up-mouse-3] 'ignore)
     (define-key keymap [return] 'company-complete-selection)
+    (define-key keymap (kbd "RET") 'company-complete-selection)
     (define-key keymap [tab] 'company-complete-common)
+    (define-key keymap (kbd "TAB") 'company-complete-common)
     (define-key keymap (kbd "<f1>") 'company-show-doc-buffer)
     (define-key keymap "\C-w" 'company-show-location)
     (define-key keymap "\C-s" 'company-search-candidates)
@@ -841,14 +858,13 @@ can retrieve meta-data for them."
               (while c2
                 (setcdr c2 (progn (while (equal (pop c2) (car c2)))
                                   c2)))))))
-    (if (and candidates
-             (or (cdr candidates)
-                 (not (eq t (compare-strings (car candidates) nil nil
-                                             prefix nil nil ignore-case)))))
-        candidates
-      ;; Already completed and unique; don't start.
-      ;; FIXME: Not the right place? maybe when setting?
-      (and company-candidates t))))
+    (when candidates
+      (if (or (cdr candidates)
+              (not (eq t (compare-strings (car candidates) nil nil
+                                          prefix nil nil ignore-case))))
+          candidates
+        ;; Already completed and unique; don't start.
+        t))))
 
 (defun company-idle-begin (buf win tick pos)
   (and company-mode
@@ -879,7 +895,10 @@ can retrieve meta-data for them."
 (defun company-manual-begin ()
   (interactive)
   (setq company--explicit-action t)
-  (company-auto-begin))
+  (unwind-protect
+      (company-auto-begin)
+    (unless company-candidates
+      (setq company--explicit-action nil))))
 
 (defun company-other-backend (&optional backward)
   (interactive (list current-prefix-arg))
@@ -1781,7 +1800,7 @@ Returns a negative number if the tooltip should be displayed above point."
                             args))
 
         (overlay-put ov 'company-column column)
-        (overlay-put ov 'company-height (abs height))))))
+        (overlay-put ov 'company-height height)))))
 
 (defun company-pseudo-tooltip-show-at-point (pos)
   (let ((col-row (company--col-row pos)))
@@ -1794,7 +1813,7 @@ Returns a negative number if the tooltip should be displayed above point."
         (height (overlay-get company-pseudo-tooltip-overlay 'company-height)))
     (overlay-put company-pseudo-tooltip-overlay 'company-before
                  (apply 'company--replacement-string
-                        (company--create-lines selection height)
+                        (company--create-lines selection (abs height))
                         (overlay-get company-pseudo-tooltip-overlay
                                      'company-replacement-args)))))
 
@@ -1815,6 +1834,10 @@ Returns a negative number if the tooltip should be displayed above point."
                  (overlay-get company-pseudo-tooltip-overlay 'company-before))
     (overlay-put company-pseudo-tooltip-overlay 'window (selected-window))))
 
+(defun company-pseudo-tooltip-guard ()
+  (buffer-substring-no-properties
+   (point) (overlay-start company-pseudo-tooltip-overlay)))
+
 (defun company-pseudo-tooltip-frontend (command)
   "A `company-mode' front-end similar to a tool-tip but based on overlays."
   (case command
@@ -1826,10 +1849,15 @@ Returns a negative number if the tooltip should be displayed above point."
                          0))
            (new-height (company--pseudo-tooltip-height)))
        (unless (and (>= (* old-height new-height) 0)
-                    (>= (abs old-height) (abs new-height)))
+                    (>= (abs old-height) (abs new-height))
+                    (equal (company-pseudo-tooltip-guard)
+                           (overlay-get company-pseudo-tooltip-overlay
+                                        'company-guard)))
          ;; Redraw needed.
          (company-pseudo-tooltip-show-at-point (- (point)
-                                                  (length company-prefix)))))
+                                                  (length company-prefix)))
+         (overlay-put company-pseudo-tooltip-overlay
+                      'company-guard (company-pseudo-tooltip-guard))))
      (company-pseudo-tooltip-unhide))
     (hide (company-pseudo-tooltip-hide)
           (setq company-tooltip-offset 0))

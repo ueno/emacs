@@ -21,12 +21,12 @@
 
 ;;; Commentary:
 ;;
-;; Eclim version 1.7.13 or newer (?) is required.
+;; Using `emacs-eclim' together with (or instead of) this back-end is
+;; recommended, as it allows you to use other Eclim features.
 ;;
-;; This completion backend is pretty barebone.
-;;
-;; `emacs-eclim' provides an alternative backend, and it also allows you to
-;; actually control Eclim from Emacs.
+;; The alternative back-end provided by `emacs-eclim' uses `yasnippet'
+;; instead of `company-template' to expand function calls, and it supports
+;; some languages other than Java.
 
 ;;; Code:
 
@@ -98,11 +98,9 @@ eclim can only complete correctly when the buffer has been saved."
       (let ((dir (company-eclim--project-dir)))
         (when dir
           (setq company-eclim--project-name
-                (let ((project (loop for project in (company-eclim--project-list)
-                                     when (equal (cdr (assoc 'path project)) dir)
-                                     return project)))
-                  (when project
-                    (cdr (assoc 'name project)))))))))
+                (loop for project in (company-eclim--project-list)
+                      when (equal (cdr (assoc 'path project)) dir)
+                      return (cdr (assoc 'name project))))))))
 
 (defun company-eclim--candidates (prefix)
   (interactive "d")
@@ -122,7 +120,8 @@ eclim can only complete correctly when the buffer has been saved."
                               (company-eclim--call-process
                                "java_complete" "-p" (company-eclim--project-name)
                                "-f" project-file
-                               "-o" (number-to-string (1- (point)))
+                               "-o" (number-to-string
+                                     (company-eclim--search-point prefix))
                                "-e" "utf-8"
                                "-l" "standard"))))
       (let* ((meta (cdr (assoc 'info item)))
@@ -132,6 +131,11 @@ eclim can only complete correctly when the buffer has been saved."
         (puthash completion meta company-eclim--doc))))
   (let ((completion-ignore-case nil))
     (all-completions prefix company-eclim--doc)))
+
+(defun company-eclim--search-point (prefix)
+  (if (or (plusp (length prefix)) (eq (char-before) ?.))
+      (1- (point))
+    (point)))
 
 (defun company-eclim--meta (candidate)
   (gethash candidate company-eclim--doc))
@@ -150,8 +154,10 @@ eclim can only complete correctly when the buffer has been saved."
     (company-template-move-to-first templ)))
 
 (defun company-eclim (command &optional arg &rest ignored)
-  "A `company-mode' completion back-end for eclim.
-eclim provides access to Eclipse Java IDE features for other editors.
+  "A `company-mode' completion back-end for Eclim.
+Eclim provides access to Eclipse Java IDE features for other editors.
+
+Eclim version 1.7.13 or newer (?) is required.
 
 Completions only work correctly when the buffer has been saved.
 `company-eclim-auto-save' determines whether to do this automatically."
