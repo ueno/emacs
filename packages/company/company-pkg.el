@@ -1,1 +1,1 @@
-(define-package "company" "0.6.6" "Modular in-buffer completion framework")
+(define-package "company" "0.6.7" "Modular in-buffer completion framework")
