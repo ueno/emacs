@@ -1,0 +1,11 @@
+IPv4 settings:
+  Address - text input
+  Prefix - text input
+  Gateway - text input
+
+DNS Settings:
+  3 DNS Servers - text input
+
+Encryption Type
+  - Check box to use encryption
+  - Drop-down list of encryption types available.

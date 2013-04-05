@@ -1,0 +1,356 @@
+NetworkManager:
+
+"<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\"
+\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">
+<node>
+  <interface name=\"org.freedesktop.DBus.Introspectable\">
+    <method name=\"Introspect\">
+      <arg name=\"data\" direction=\"out\" type=\"s\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.DBus.Properties\">
+    <method name=\"Get\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"out\" type=\"v\"/>
+    </method>
+    <method name=\"Set\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"in\" type=\"v\"/>
+    </method>
+    <method name=\"GetAll\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"props\" direction=\"out\" type=\"a{sv}\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.NetworkManager\">
+    <method name=\"state\">
+      <arg name=\"state\" type=\"u\" direction=\"out\"/>
+    </method>
+    <method name=\"SetLogging\">
+      <arg name=\"level\" type=\"s\" direction=\"in\"/>
+      <arg name=\"domains\" type=\"s\" direction=\"in\"/>
+    </method>
+    <method name=\"GetPermissions\">
+      <arg name=\"permissions\" type=\"a{ss}\" direction=\"out\"/>
+    </method>
+    <method name=\"Enable\">
+      <arg name=\"enable\" type=\"b\" direction=\"in\"/>
+    </method>
+    <method name=\"Sleep\">
+      <arg name=\"sleep\" type=\"b\" direction=\"in\"/>
+    </method>
+    <method name=\"DeactivateConnection\">
+      <arg name=\"active_connection\" type=\"o\" direction=\"in\"/>
+    </method>
+    <method name=\"AddAndActivateConnection\">
+      <arg name=\"connection\" type=\"a{sa{sv}}\" direction=\"in\"/>
+      <arg name=\"device\" type=\"o\" direction=\"in\"/>
+      <arg name=\"specific_object\" type=\"o\" direction=\"in\"/>
+      <arg name=\"path\" type=\"o\" direction=\"out\"/>
+      <arg name=\"active_connection\" type=\"o\" direction=\"out\"/>
+    </method>
+    <method name=\"ActivateConnection\">
+      <arg name=\"connection\" type=\"o\" direction=\"in\"/>
+      <arg name=\"device\" type=\"o\" direction=\"in\"/>
+      <arg name=\"specific_object\" type=\"o\" direction=\"in\"/>
+      <arg name=\"active_connection\" type=\"o\" direction=\"out\"/>
+    </method>
+    <method name=\"GetDeviceByIpIface\">
+      <arg name=\"iface\" type=\"s\" direction=\"in\"/>
+      <arg name=\"device\" type=\"o\" direction=\"out\"/>
+    </method>
+    <method name=\"GetDevices\">
+      <arg name=\"devices\" type=\"ao\" direction=\"out\"/>
+    </method>
+    <signal name=\"DeviceRemoved\">
+      <arg type=\"o\"/>
+    </signal>
+    <signal name=\"DeviceAdded\">
+      <arg type=\"o\"/>
+    </signal>
+    <signal name=\"PropertiesChanged\">
+      <arg type=\"a{sv}\"/>
+    </signal>
+    <signal name=\"StateChanged\">
+      <arg type=\"u\"/>
+    </signal>
+    <signal name=\"CheckPermissions\">
+    </signal>
+    <property name=\"State\" type=\"u\" access=\"read\"/>
+    <property name=\"Version\" type=\"s\" access=\"read\"/>
+    <property name=\"ActiveConnections\" type=\"ao\" access=\"read\"/>
+    <property name=\"WimaxHardwareEnabled\" type=\"b\" access=\"read\"/>
+    <property name=\"WimaxEnabled\" type=\"b\" access=\"readwrite\"/>
+    <property name=\"WwanHardwareEnabled\" type=\"b\" access=\"read\"/>
+    <property name=\"WwanEnabled\" type=\"b\" access=\"readwrite\"/>
+    <property name=\"WirelessHardwareEnabled\" type=\"b\" access=\"read\"/>
+    <property name=\"WirelessEnabled\" type=\"b\" access=\"readwrite\"/>
+    <property name=\"NetworkingEnabled\" type=\"b\" access=\"read\"/>
+  </interface>
+  <node name=\"AccessPoint\"/>
+  <node name=\"AgentManager\"/>
+  <node name=\"Devices\"/>
+  <node name=\"Settings\"/>
+</node>
+"
+
+AccessPoint/*:
+
+"<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\"
+\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">
+<node>
+  <interface name=\"org.freedesktop.DBus.Introspectable\">
+    <method name=\"Introspect\">
+      <arg name=\"data\" direction=\"out\" type=\"s\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.DBus.Properties\">
+    <method name=\"Get\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"out\" type=\"v\"/>
+    </method>
+    <method name=\"Set\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"in\" type=\"v\"/>
+    </method>
+    <method name=\"GetAll\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"props\" direction=\"out\" type=\"a{sv}\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.NetworkManager.AccessPoint\">
+    <signal name=\"PropertiesChanged\">
+      <arg type=\"a{sv}\"/>
+    </signal>
+    <property name=\"Strength\" type=\"y\" access=\"read\"/>
+    <property name=\"MaxBitrate\" type=\"u\" access=\"read\"/>
+    <property name=\"Mode\" type=\"u\" access=\"read\"/>
+    <property name=\"HwAddress\" type=\"s\" access=\"read\"/>
+    <property name=\"Frequency\" type=\"u\" access=\"read\"/>
+    <property name=\"Ssid\" type=\"ay\" access=\"read\"/>
+    <property name=\"RsnFlags\" type=\"u\" access=\"read\"/>
+    <property name=\"WpaFlags\" type=\"u\" access=\"read\"/>
+    <property name=\"Flags\" type=\"u\" access=\"read\"/>
+  </interface>
+</node>
+"
+
+Devices/*:
+
+"<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\"
+\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">
+<node>
+  <interface name=\"org.freedesktop.DBus.Introspectable\">
+    <method name=\"Introspect\">
+      <arg name=\"data\" direction=\"out\" type=\"s\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.DBus.Properties\">
+    <method name=\"Get\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"out\" type=\"v\"/>
+    </method>
+    <method name=\"Set\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"in\" type=\"v\"/>
+    </method>
+    <method name=\"GetAll\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"props\" direction=\"out\" type=\"a{sv}\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.NetworkManager.Device\">
+    <method name=\"Disconnect\">
+    </method>
+    <signal name=\"StateChanged\">
+      <arg type=\"u\"/>
+      <arg type=\"u\"/>
+      <arg type=\"u\"/>
+    </signal>
+    <property name=\"DeviceType\" type=\"u\" access=\"read\"/>
+    <property name=\"FirmwareMissing\" type=\"b\" access=\"read\"/>
+    <property name=\"Autoconnect\" type=\"b\" access=\"readwrite\"/>
+    <property name=\"Managed\" type=\"b\" access=\"read\"/>
+    <property name=\"Dhcp6Config\" type=\"o\" access=\"read\"/>
+    <property name=\"Ip6Config\" type=\"o\" access=\"read\"/>
+    <property name=\"Dhcp4Config\" type=\"o\" access=\"read\"/>
+    <property name=\"Ip4Config\" type=\"o\" access=\"read\"/>
+    <property name=\"ActiveConnection\" type=\"o\" access=\"read\"/>
+    <property name=\"StateReason\" type=\"(uu)\" access=\"read\"/>
+    <property name=\"State\" type=\"u\" access=\"read\"/>
+    <property name=\"Ip4Address\" type=\"u\" access=\"read\"/>
+    <property name=\"Capabilities\" type=\"u\" access=\"read\"/>
+    <property name=\"FirmwareVersion\" type=\"s\" access=\"read\"/>
+    <property name=\"DriverVersion\" type=\"s\" access=\"read\"/>
+    <property name=\"Driver\" type=\"s\" access=\"read\"/>
+    <property name=\"IpInterface\" type=\"s\" access=\"read\"/>
+    <property name=\"Interface\" type=\"s\" access=\"read\"/>
+    <property name=\"Udi\" type=\"s\" access=\"read\"/>
+  </interface>
+  <interface name=\"org.freedesktop.NetworkManager.Device.Wireless\">
+    <method name=\"RequestScan\">
+      <arg name=\"options\" type=\"a{sv}\" direction=\"in\"/>
+    </method>
+    <method name=\"GetAccessPoints\">
+      <arg name=\"access_points\" type=\"ao\" direction=\"out\"/>
+    </method>
+    <signal name=\"AccessPointRemoved\">
+      <arg type=\"o\"/>
+    </signal>
+    <signal name=\"AccessPointAdded\">
+      <arg type=\"o\"/>
+    </signal>
+    <signal name=\"PropertiesChanged\">
+      <arg type=\"a{sv}\"/>
+    </signal>
+    <property name=\"WirelessCapabilities\" type=\"u\" access=\"read\"/>
+    <property name=\"ActiveAccessPoint\" type=\"o\" access=\"read\"/>
+    <property name=\"Bitrate\" type=\"u\" access=\"read\"/>
+    <property name=\"Mode\" type=\"u\" access=\"read\"/>
+    <property name=\"PermHwAddress\" type=\"s\" access=\"read\"/>
+    <property name=\"HwAddress\" type=\"s\" access=\"read\"/>
+  </interface>
+</node>
+"
+
+AgentManager:
+
+"<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\"
+\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">
+<node>
+  <interface name=\"org.freedesktop.DBus.Introspectable\">
+    <method name=\"Introspect\">
+      <arg name=\"data\" direction=\"out\" type=\"s\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.DBus.Properties\">
+    <method name=\"Get\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"out\" type=\"v\"/>
+    </method>
+    <method name=\"Set\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"in\" type=\"v\"/>
+    </method>
+    <method name=\"GetAll\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"props\" direction=\"out\" type=\"a{sv}\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.NetworkManager.AgentManager\">
+    <method name=\"Unregister\">
+    </method>
+    <method name=\"Register\">
+      <arg name=\"identifier\" type=\"s\" direction=\"in\"/>
+    </method>
+  </interface>
+</node>
+"
+
+Settings:
+
+"<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\"
+\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">
+<node>
+  <interface name=\"org.freedesktop.DBus.Introspectable\">
+    <method name=\"Introspect\">
+      <arg name=\"data\" direction=\"out\" type=\"s\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.DBus.Properties\">
+    <method name=\"Get\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"out\" type=\"v\"/>
+    </method>
+    <method name=\"Set\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"in\" type=\"v\"/>
+    </method>
+    <method name=\"GetAll\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"props\" direction=\"out\" type=\"a{sv}\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.NetworkManager.Settings\">
+    <method name=\"SaveHostname\">
+      <arg name=\"hostname\" type=\"s\" direction=\"in\"/>
+    </method>
+    <method name=\"AddConnection\">
+      <arg name=\"connection\" type=\"a{sa{sv}}\" direction=\"in\"/>
+      <arg name=\"path\" type=\"o\" direction=\"out\"/>
+    </method>
+    <method name=\"GetConnectionByUuid\">
+      <arg name=\"uuid\" type=\"s\" direction=\"in\"/>
+      <arg name=\"connection\" type=\"o\" direction=\"out\"/>
+    </method>
+    <method name=\"ListConnections\">
+      <arg name=\"connections\" type=\"ao\" direction=\"out\"/>
+    </method>
+    <signal name=\"NewConnection\">
+      <arg type=\"o\"/>
+    </signal>
+    <signal name=\"PropertiesChanged\">
+      <arg type=\"a{sv}\"/>
+    </signal>
+    <property name=\"CanModify\" type=\"b\" access=\"read\"/>
+    <property name=\"Hostname\" type=\"s\" access=\"read\"/>
+  </interface>
+  <node name=\"0\"/>
+</node>
+"
+Settings/0:
+
+"<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\"
+\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">
+<node>
+  <interface name=\"org.freedesktop.DBus.Introspectable\">
+    <method name=\"Introspect\">
+      <arg name=\"data\" direction=\"out\" type=\"s\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.DBus.Properties\">
+    <method name=\"Get\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"out\" type=\"v\"/>
+    </method>
+    <method name=\"Set\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"propname\" direction=\"in\" type=\"s\"/>
+      <arg name=\"value\" direction=\"in\" type=\"v\"/>
+    </method>
+    <method name=\"GetAll\">
+      <arg name=\"interface\" direction=\"in\" type=\"s\"/>
+      <arg name=\"props\" direction=\"out\" type=\"a{sv}\"/>
+    </method>
+  </interface>
+  <interface name=\"org.freedesktop.NetworkManager.Settings.Connection\">
+    <method name=\"GetSecrets\">
+      <arg name=\"setting_name\" type=\"s\" direction=\"in\"/>
+      <arg name=\"secrets\" type=\"a{sa{sv}}\" direction=\"out\"/>
+    </method>
+    <method name=\"GetSettings\">
+      <arg name=\"settings\" type=\"a{sa{sv}}\" direction=\"out\"/>
+    </method>
+    <method name=\"Delete\">
+    </method>
+    <method name=\"Update\">
+      <arg name=\"properties\" type=\"a{sa{sv}}\" direction=\"in\"/>
+    </method>
+    <signal name=\"Removed\">
+    </signal>
+    <signal name=\"Updated\">
+    </signal>
+  </interface>
+</node>
+"
