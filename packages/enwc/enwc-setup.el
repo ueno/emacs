@@ -1,6 +1,6 @@
 ;; enwc-setup.el - Setup routines for ENWC
 
-;; Copyright (C) 2012,2013 Free Software Foundation
+;; Copyright (C) 2012,2013 Free Software Foundation, Inc.
 
 ;; Author: Ian Dunn
 ;; Keywords: enwc, network, wicd, manager, nm

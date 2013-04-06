@@ -5,7 +5,30 @@ either a single-file package or a multifile package.
 
 A nightly cron job refreshes the GNU ELPA archive from this repository.
 
-This cron job only creates a new package when the "version" of a package
-is modified.  This means that you can safely work on the next version here
-without worrying about the unstable code making it to GNU ELPA, and simply
-update the "version" when you want to release the new code.
+This cron job only creates a new package when the "version" (as specified in
+the foo-pkg.el or in the "Version:" header) of a package is modified.
+This means that you can safely work on the next version here without
+worrying about the unstable code making it to GNU ELPA, and simply update
+the "version" when you want to release the new code.
+
+* External branches:
+
+Some packages have an external upstream branch.
+You should ideally be able to "bzr merge <URL>" from them, and it often
+works, but it generally requires some hand-holding to set it up.
+More specifically, the first "bzr merge" (ideally done when installing the
+package into `elpa') needs to be a "bzr join" since there's no
+common ancestor.  Worse, "bzr join" doesn't work so well with bzr-git, so
+you need to do a bit of gymnastics:
+
+   git clone <giturl>   # Done because bzr-git works better locally
+   bzr branch <localgit> tmp
+   cd tmp
+   bzr mkdir .newroot
+   bzr mv * .newroot/
+   ... maybe other bzr mv .<blabla> .newroot/ ...
+   bzr split .newroot
+   mv .newroot .../elpa/packages/<package>
+   cd .../elpa/packages/
+   bzr join <package>
+   
