@@ -183,6 +183,23 @@
 
 (eval-when-compile (require 'cl-lib))
 
+(eval-and-compile
+  (unless (fboundp 'case-table-get-table)
+    ;; Copied from 24.4
+    (defun case-table-get-table (case-table table)
+      "Return the TABLE of CASE-TABLE.
+TABLE can be `down', `up', `eqv' or `canon'."
+      (let ((slot-nb (cdr (assq table '((up . 0) (canon . 1) (eqv . 2))))))
+        (or (if (eq table 'down) case-table)
+            (char-table-extra-slot case-table slot-nb)
+            (let ((old (standard-case-table)))
+              (unwind-protect
+                  (progn
+                    (set-standard-case-table case-table)
+                    (char-table-extra-slot case-table slot-nb))
+                (or (eq case-table old)
+                    (set-standard-case-table old)))))))))
+
 (defun copy-char-table (ct1)
   (let* ((subtype (char-table-subtype ct1))
          (ct2 (make-char-table subtype)))
@@ -269,7 +286,7 @@
           (if (memq x l) (progn (debug) nil)
             (setq hash (+ hash (sxhash x))))))
       hash)))
-      
+
 
 (defun lex--flatten-state (state)
   (cl-assert (memq (car state) '(and or orelse)))
@@ -446,7 +463,7 @@
 
 (defun lex--merge-and-join (lex)
   (lex--merge-2 'and lex lex))
-    
+
 
 (defun lex--merge (&rest state)
   (cl-assert (memq (car state) '(and or orelse)))
@@ -545,7 +562,7 @@ or (check (not (PREDICATE . ARG))).")
                   (not (eq tmp char)))
         (push tmp chars))
       (if chars (cons char chars)))))
-    
+
 ;; For convenience we use lex itself to tokenize charset strings, so we
 ;; define it in another file.
 (autoload 'lex--parse-charset "lex-parse-re")
@@ -666,7 +683,7 @@ or (check (not (PREDICATE . ARG))).")
          (setcar newstate (if (memq (car re) '(*\?)) 'orelse 'or))
          (push newstate lex--states)
          newstate))
-      
+
       ((or `string-end `eos `eot `buffer-end `eob)
        `(check (lex--match-eobp) ,state))
       ((or `string-start `bos `bot `buffer-start `bob)
@@ -691,7 +708,7 @@ or (check (not (PREDICATE . ARG))).")
       (`not-category `(check (lex--match-category
                               . ,(lex--compile-category (cadr re)))
                              nil . ,(lex--nfa 'anything state)))
-      
+
       ;; `rx' accepts char-classes directly as regexps.  Let's reluctantly
       ;; do the same.
       ((or `digit `numeric `num `control `cntrl `hex-digit `hex `xdigit `blank
@@ -756,7 +773,7 @@ or (check (not (PREDICATE . ARG))).")
        ;; `rx' defined `and' as `sequence', but we may want to define it
        ;; as intersection instead.
        (error "`and' is deprecated, use `seq', `:', or `sequence' instead"))
-         
+
       ((or `1+ `one-or-more `+ `+\?)
        (lex--nfa `(seq (seq ,@(cdr re))
                        (,(if (memq (car re) '(+\?)) '*\? '0+) ,@(cdr re)))
@@ -856,7 +873,7 @@ or (check (not (PREDICATE . ARG))).")
             (setcar newstate (car res))
             (setcdr newstate (cdr res))
             newstate)))))
-              
+
 (defun lex-negate (nfa state)
   "Concatenate the negation of NFA with STATE.
 Returns a new NFA."
@@ -919,7 +936,7 @@ Returns a new NFA."
   (lex--dfa-wrapper
    (lambda ()
      (lex--nfa '(*\? (char not)) match-dfa))))
-     
+
 
 (defun lex--terminate-if (new old)
   (cond
@@ -1163,7 +1180,7 @@ state of the engine at STOP, which can be passed back to
     ;; so it can be correctly used to continue the match with a different
     ;; content than what's after `stop'.
     (nconc match lastlex)))
-        
+
 (defun lex-match-string-first (lex string &optional start stop)
   "Match LEX against STRING between START and STOP.
 Return a triplet (VALUE ENDPOS . LEXER) where VALUE is the
