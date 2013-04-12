@@ -1,4 +1,4 @@
-;; omn-mode.el --- Support for OWL Manchester Notation
+;;; omn-mode.el --- Support for OWL Manchester Notation
 
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
