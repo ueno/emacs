@@ -1,4 +1,4 @@
-;;; company-dabbrev.el --- A dabbrev-like company-mode completion back-end
+;;; company-dabbrev.el --- dabbrev-like company-mode completion back-end
 
 ;; Copyright (C) 2009, 2011  Free Software Foundation, Inc.
 
@@ -28,25 +28,26 @@
 (require 'company)
 (eval-when-compile (require 'cl))
 
+(defgroup company-dabbrev nil
+  "dabbrev-like completion back-end."
+  :group 'company)
+
 (defcustom company-dabbrev-other-buffers 'all
   "Determines whether `company-dabbrev' should search other buffers.
 If `all', search all other buffers.  If t, search buffers with the same
 major mode.
 See also `company-dabbrev-time-limit'."
-  :group 'company
   :type '(choice (const :tag "Off" nil)
                  (const :tag "Same major mode" t)
                  (const :tag "All" all)))
 
 (defcustom company-dabbrev-time-limit .5
   "Determines how many seconds `company-dabbrev' should look for matches."
-  :group 'company
   :type '(choice (const :tag "Off" nil)
                  (number :tag "Seconds")))
 
 (defcustom company-dabbrev-char-regexp "\\sw"
   "A regular expression matching the characters `company-dabbrev' looks for."
-  :group 'company
   :type 'regexp)
 
 (defmacro company-dabrev--time-limit-while (test start limit &rest body)
@@ -109,7 +110,7 @@ See also `company-dabbrev-time-limit'."
 
 ;;;###autoload
 (defun company-dabbrev (command &optional arg &rest ignored)
-  "A dabbrev-like `company-mode' completion back-end."
+  "dabbrev-like `company-mode' completion back-end."
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-dabbrev))

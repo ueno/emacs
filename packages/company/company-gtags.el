@@ -1,4 +1,4 @@
-;;; company-gtags.el --- A company-mode completion back-end for GNU Global
+;;; company-gtags.el --- company-mode completion back-end for GNU Global
 
 ;; Copyright (C) 2009-2011  Free Software Foundation, Inc.
 
@@ -28,11 +28,14 @@
 (require 'company)
 (eval-when-compile (require 'cl))
 
+(defgroup company-gtags nil
+  "Completion back-end for GNU Global."
+  :group 'company)
+
 (defcustom company-gtags-executable
   (executable-find "global")
   "Location of GNU global executable."
-  :type 'string
-  :group 'company)
+  :type 'string)
 
 (define-obsolete-variable-alias
   'company-gtags-gnu-global-program-name
@@ -70,7 +73,7 @@
 
 ;;;###autoload
 (defun company-gtags (command &optional arg &rest ignored)
-  "A `company-mode' completion back-end for GNU Global."
+  "`company-mode' completion back-end for GNU Global."
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-gtags))

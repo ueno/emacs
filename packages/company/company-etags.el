@@ -1,4 +1,4 @@
-;;; company-etags.el --- A company-mode completion back-end for etags
+;;; company-etags.el --- company-mode completion back-end for etags
 
 ;; Copyright (C) 2009-2011  Free Software Foundation, Inc.
 
@@ -28,11 +28,14 @@
 (require 'company)
 (require 'etags)
 
+(defgroup company-etags nil
+  "Completion back-end for etags."
+  :group 'company)
+
 (defcustom company-etags-use-main-table-list t
   "Always search `tags-table-list' if set.
 If this is disabled, `company-etags' will try to find the one table for each
 buffer automatically."
-  :group 'company-mode
   :type '(choice (const :tag "off" nil)
                  (const :tag "on" t)))
 
@@ -66,7 +69,7 @@ buffer automatically."
 
 ;;;###autoload
 (defun company-etags (command &optional arg &rest ignored)
-  "A `company-mode' completion back-end for etags."
+  "`company-mode' completion back-end for etags."
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-etags))

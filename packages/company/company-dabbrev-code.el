@@ -1,4 +1,4 @@
-;;; company-dabbrev-code.el --- A dabbrev-like company-mode back-end for code
+;;; company-dabbrev-code.el --- dabbrev-like company-mode back-end for code
 
 ;; Copyright (C) 2009, 2011  Free Software Foundation, Inc.
 
@@ -29,6 +29,10 @@
 (require 'company-dabbrev)
 (eval-when-compile (require 'cl))
 
+(defgroup company-dabbrev-code nil
+  "dabbrev-like completion back-end for code."
+  :group 'company)
+
 (defcustom company-dabbrev-code-modes
   '(asm-mode batch-file-mode c++-mode c-mode cperl-mode csharp-mode css-mode
     emacs-lisp-mode erlang-mode espresso-mode f90-mode fortran-mode
@@ -40,7 +44,6 @@ In all these modes `company-dabbrev-code' will complete only symbols, not text
 in comments or strings.  In other modes `company-dabbrev-code' will pass control
 to other back-ends \(e.g. `company-dabbrev'\).
 Value t means complete in all modes."
-  :group 'company
   :type '(choice (repeat (symbol :tag "Major mode"))
                  (const tag "All modes" t)))
 
@@ -49,14 +52,12 @@ Value t means complete in all modes."
 If `all', search all other buffers.  If t, search buffers with the same
 major mode.
 See also `company-dabbrev-code-time-limit'."
-  :group 'company
   :type '(choice (const :tag "Off" nil)
                  (const :tag "Same major mode" t)
                  (const :tag "All" all)))
 
 (defcustom company-dabbrev-code-time-limit .5
   "Determines how long `company-dabbrev-code' should look for matches."
-  :group 'company
   :type '(choice (const :tag "Off" nil)
                  (number :tag "Seconds")))
 
@@ -68,7 +69,7 @@ See also `company-dabbrev-code-time-limit'."
 
 ;;;###autoload
 (defun company-dabbrev-code (command &optional arg &rest ignored)
-  "A dabbrev-like `company-mode' back-end for code.
+  "dabbrev-like `company-mode' back-end for code.
 The back-end looks for all symbols in the current buffer that aren't in
 comments or strings."
   (interactive (list 'interactive))

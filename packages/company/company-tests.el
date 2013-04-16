@@ -29,6 +29,8 @@
 (require 'company)
 (require 'company-keywords)
 
+;;; Core
+
 (ert-deftest company-sorted-keywords ()
   "Test that keywords in `company-keywords-alist' are in alphabetical order."
   (dolist (pair company-keywords-alist)
@@ -173,6 +175,8 @@
         (company-call 'open-line 1)
         (should (eq 2 (overlay-start company-pseudo-tooltip-overlay)))))))
 
+;;; Template
+
 (ert-deftest company-template-removed-after-the-last-jump ()
   (with-temp-buffer
     (insert "{ }")
@@ -181,8 +185,7 @@
       (save-excursion
         (dotimes (i 2)
           (insert " ")
-          (company-template-add-field tpl (point) "foo")
-          (forward-char 3)))
+          (company-template-add-field tpl (point) "foo")))
       (company-call 'template-forward-field)
       (should (= 3 (point)))
       (company-call 'template-forward-field)
@@ -217,6 +220,18 @@
     (apply command args)
     (let ((this-command command))
       (run-hooks 'post-command-hook))))
+
+(ert-deftest company-template-c-like-templatify ()
+  (with-temp-buffer
+    (let ((text "foo(int a, short b)"))
+      (insert text)
+      (company-template-c-like-templatify text)
+      (should (equal "foo(arg0, arg1)" (buffer-string)))
+      (should (looking-at "arg0"))
+      (should (equal "int a"
+                     (overlay-get (company-template-field-at) 'display))))))
+
+;;; Elisp
 
 (defmacro company-elisp-with-buffer (contents &rest body)
   (declare (indent 0))
@@ -382,3 +397,14 @@
   (company-elisp-with-buffer
     "(defun foob ()|)"
     (should (equal "" (company-elisp 'prefix)))))
+
+;;; Clang
+
+(ert-deftest company-clang-objc-templatify ()
+  (with-temp-buffer
+    (let ((text "createBookWithTitle:andAuthor:"))
+      (insert text)
+      (company-clang-objc-templatify text)
+      (should (equal "createBookWithTitle:arg0 andAuthor:arg1" (buffer-string)))
+      (should (looking-at "arg0"))
+      (should (null (overlay-get (company-template-field-at) 'display))))))

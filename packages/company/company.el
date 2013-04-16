@@ -4,7 +4,7 @@
 
 ;; Author: Nikolaj Schumacher
 ;; Maintainer: Dmitry Gutov <dgutov@yandex.ru>
-;; Version: 0.6.7
+;; Version: 0.6.8
 ;; Keywords: abbrev, convenience, matching
 ;; URL: http://company-mode.github.com/
 ;; Compatibility: GNU Emacs 22.x, GNU Emacs 23.x, GNU Emacs 24.x
@@ -91,8 +91,7 @@
      (:background "cornsilk"))
     (((class color) (min-colors 88) (background dark))
      (:background "yellow")))
-  "Face used for the tool tip."
-  :group 'company)
+  "Face used for the tooltip.")
 
 (defface company-tooltip-selection
   '((default :inherit company-tooltip)
@@ -101,13 +100,11 @@
     (((class color) (min-colors 88) (background dark))
      (:background "orange1"))
     (t (:background "green")))
-  "Face used for the selection in the tool tip."
-  :group 'company)
+  "Face used for the selection in the tooltip.")
 
 (defface company-tooltip-mouse
   '((default :inherit highlight))
-  "Face used for the tool tip item under the mouse."
-  :group 'company)
+  "Face used for the tooltip item under the mouse.")
 
 (defface company-tooltip-common
   '((default :inherit company-tooltip)
@@ -115,8 +112,7 @@
      :foreground "darkred")
     (((background dark))
      :foreground "red"))
-  "Face used for the common completion in the tool tip."
-  :group 'company)
+  "Face used for the common completion in the tooltip.")
 
 (defface company-tooltip-common-selection
   '((default :inherit company-tooltip-selection)
@@ -124,36 +120,30 @@
      :foreground "darkred")
     (((background dark))
      :foreground "red"))
-  "Face used for the selected common completion in the tool tip."
-  :group 'company)
+  "Face used for the selected common completion in the tooltip.")
 
 (defface company-preview
   '((t :background "blue4"
        :foreground "wheat"))
-  "Face used for the completion preview."
-  :group 'company)
+  "Face used for the completion preview.")
 
 (defface company-preview-common
   '((t :inherit company-preview
        :foreground "red"))
-  "Face used for the common part of the completion preview."
-  :group 'company)
+  "Face used for the common part of the completion preview.")
 
 (defface company-preview-search
   '((t :inherit company-preview
        :background "blue1"))
-  "Face used for the search string in the completion preview."
-  :group 'company)
+  "Face used for the search string in the completion preview.")
 
 (defface company-echo nil
-  "Face used for completions in the echo area."
-  :group 'company)
+  "Face used for completions in the echo area.")
 
 (defface company-echo-common
   '((((background dark)) (:foreground "firebrick1"))
     (((background light)) (:background "firebrick4")))
-  "Face used for the common part of completions in the echo area."
-  :group 'company)
+  "Face used for the common part of completions in the echo area.")
 
 (defun company-frontends-set (variable value)
   ;; uniquify
@@ -197,7 +187,6 @@ The visualized data is stored in `company-prefix', `company-candidates',
 `company-common', `company-selection', `company-point' and
 `company-search-string'."
   :set 'company-frontends-set
-  :group 'company
   :type '(repeat (choice (const :tag "echo" company-echo-frontend)
                          (const :tag "echo, strip common"
                                 company-echo-strip-common-frontend)
@@ -213,34 +202,32 @@ The visualized data is stored in `company-prefix', `company-candidates',
                          (function :tag "custom function" nil))))
 
 (defcustom company-tooltip-limit 10
-  "The maximum number of candidates in the tool tip"
-  :group 'company
+  "The maximum number of candidates in the tooltip"
   :type 'integer)
 
 (defcustom company-tooltip-minimum 6
-  "The minimum height of the tool tip.
+  "The minimum height of the tooltip.
 If this many lines are not available, prefer to display the tooltip above."
-  :group 'company
   :type 'integer)
 
 (defvar company-safe-backends
   '((company-abbrev . "Abbrev")
-    (company-clang . "clang")
+    (company-clang . "Clang")
     (company-css . "CSS")
     (company-dabbrev . "dabbrev for plain text")
     (company-dabbrev-code . "dabbrev for code")
-    (company-eclim . "eclim (an Eclipse interace)")
+    (company-eclim . "Eclim (an Eclipse interface)")
     (company-elisp . "Emacs Lisp")
     (company-etags . "etags")
     (company-files . "Files")
     (company-gtags . "GNU Global")
-    (company-ispell . "ispell")
+    (company-ispell . "Ispell")
     (company-keywords . "Programming language keywords")
     (company-nxml . "nxml")
     (company-oddmuse . "Oddmuse")
     (company-pysmell . "PySmell")
     (company-ropemacs . "ropemacs")
-    (company-semantic . "CEDET Semantic")
+    (company-semantic . "Semantic")
     (company-tempo . "Tempo templates")
     (company-xcode . "Xcode")))
 (put 'company-safe-backends 'risky-local-variable t)
@@ -276,7 +263,7 @@ Requires Emacs 24.1 or newer."
                           (plist-get (nthcdr 4 res) :predicate)))))))
 
 (defcustom company-backends '(company-elisp company-nxml company-css
-                              company-clang company-semantic company-eclim
+                              company-semantic company-clang company-eclim
                               company-xcode company-ropemacs
                               (company-gtags company-etags company-dabbrev-code
                                company-keywords)
@@ -343,7 +330,6 @@ e.g. to expand a snippet.
 The back-end should return nil for all commands it does not support or
 does not know about.  It should also be callable interactively and use
 `company-begin-backend' to start itself in that case."
-  :group 'company
   :type `(repeat
           (choice
            :tag "Back-end"
@@ -363,14 +349,12 @@ does not know about.  It should also be callable interactively and use
   "Hook run when company starts completing.
 The hook is called with one argument that is non-nil if the completion was
 started manually."
-  :group 'company
   :type 'hook)
 
 (defcustom company-completion-cancelled-hook nil
   "Hook run when company cancels completing.
 The hook is called with one argument that is non-nil if the completion was
 aborted manually."
-  :group 'company
   :type 'hook)
 
 (defcustom company-completion-finished-hook nil
@@ -379,12 +363,10 @@ The hook is called with the selected candidate as an argument.
 
 If you indend to use it to post-process candidates from a specific back-end,
 consider using the `post-completion' command instead."
-  :group 'company
   :type 'hook)
 
 (defcustom company-minimum-prefix-length 3
   "The minimum prefix length for automatic completion."
-  :group 'company
   :type '(integer :tag "prefix length"))
 
 (defcustom company-require-match 'company-explicit-action-p
@@ -393,25 +375,23 @@ This can be a function do determine if a match is required.
 
 This can be overridden by the back-end, if it returns t or 'never to
 'require-match.  `company-auto-complete' also takes precedence over this."
-  :group 'company
   :type '(choice (const :tag "Off" nil)
                  (function :tag "Predicate function")
                  (const :tag "On, if user interaction took place"
                         'company-explicit-action-p)
                  (const :tag "On" t)))
 
-(defcustom company-auto-complete 'company-explicit-action-p
+(defcustom company-auto-complete nil
   "Determines when to auto-complete.
 If this is enabled, all characters from `company-auto-complete-chars' complete
 the selected completion.  This can also be a function."
-  :group 'company
   :type '(choice (const :tag "Off" nil)
                  (function :tag "Predicate function")
                  (const :tag "On, if user interaction took place"
                         'company-explicit-action-p)
                  (const :tag "On" t)))
 
-(defcustom company-auto-complete-chars '(?\  ?\( ?\) ?. ?\" ?$ ?\' ?< ?| ?!)
+(defcustom company-auto-complete-chars '(?\  ?\) ?.)
   "Determines which characters trigger an automatic completion.
 See `company-auto-complete'.  If this is a string, each string character causes
 completion.  If it is a list of syntax description characters (see
@@ -421,7 +401,6 @@ This can also be a function, which is called with the new input and should
 return non-nil if company should auto-complete.
 
 A character that is part of a valid candidate never triggers auto-completion."
-  :group 'company
   :type '(choice (string :tag "Characters")
                  (set :tag "Syntax"
                       (const :tag "Whitespace" ?\ )
@@ -444,7 +423,6 @@ A character that is part of a valid candidate never triggers auto-completion."
   "The idle delay in seconds until automatic completions starts.
 A value of nil means never complete automatically, t means complete
 immediately when a prefix of `company-minimum-prefix-length' is reached."
-  :group 'company
   :type '(choice (const :tag "never (nil)" nil)
                  (const :tag "immediate (t)" t)
                  (number :tag "seconds")))
@@ -455,14 +433,12 @@ If this is t, it will complete after any command.  See `company-idle-delay'.
 
 Alternatively any command with a non-nil 'company-begin property is treated as
 if it was on this list."
-  :group 'company
   :type '(choice (const :tag "Any command" t)
                  (const :tag "Self insert command" '(self-insert-command))
                  (repeat :tag "Commands" function)))
 
 (defcustom company-show-numbers nil
   "If enabled, show quick-access numbers for the first ten candidates."
-  :group 'company
   :type '(choice (const :tag "off" nil)
                  (const :tag "on" t)))
 
@@ -924,10 +900,6 @@ can retrieve meta-data for them."
                  (funcall company-require-match)
                (eq company-require-match t))
              (not (eq backend-value 'never))))))
-
-(defun company-punctuation-p (input)
-  "Return non-nil, if input starts with punctuation or parentheses."
-  (memq (char-syntax (string-to-char input)) '(?. ?\( ?\))))
 
 (defun company-auto-complete-p (input)
   "Return non-nil, if input starts with punctuation or parentheses."
@@ -1839,7 +1811,7 @@ Returns a negative number if the tooltip should be displayed above point."
    (point) (overlay-start company-pseudo-tooltip-overlay)))
 
 (defun company-pseudo-tooltip-frontend (command)
-  "A `company-mode' front-end similar to a tool-tip but based on overlays."
+  "`company-mode' front-end similar to a tooltip but based on overlays."
   (case command
     (pre-command (company-pseudo-tooltip-hide-temporarily))
     (post-command
@@ -1909,7 +1881,7 @@ Returns a negative number if the tooltip should be displayed above point."
     (setq company-preview-overlay nil)))
 
 (defun company-preview-frontend (command)
-  "A `company-mode' front-end showing the selection as if it had been inserted."
+  "`company-mode' front-end showing the selection as if it had been inserted."
   (case command
     (pre-command (company-preview-hide))
     (post-command (company-preview-show-at-point (point)))
@@ -2013,19 +1985,19 @@ Returns a negative number if the tooltip should be displayed above point."
     (company-echo-show)))
 
 (defun company-echo-frontend (command)
-  "A `company-mode' front-end showing the candidates in the echo area."
+  "`company-mode' front-end showing the candidates in the echo area."
   (case command
     (post-command (company-echo-show-soon 'company-echo-format))
     (hide (company-echo-hide))))
 
 (defun company-echo-strip-common-frontend (command)
-  "A `company-mode' front-end showing the candidates in the echo area."
+  "`company-mode' front-end showing the candidates in the echo area."
   (case command
     (post-command (company-echo-show-soon 'company-echo-strip-common-format))
     (hide (company-echo-hide))))
 
 (defun company-echo-metadata-frontend (command)
-  "A `company-mode' front-end showing the documentation in the echo area."
+  "`company-mode' front-end showing the documentation in the echo area."
   (case command
     (post-command (company-echo-show-when-idle 'company-fetch-metadata))
     (hide (company-echo-hide))))
