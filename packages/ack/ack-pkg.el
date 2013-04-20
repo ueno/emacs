@@ -1,1 +1,1 @@
-(define-package "ack" "0.9" "Interface to ack, a source code search tool")
+(define-package "ack" "1.0" "Interface to ack, a source code search tool")
