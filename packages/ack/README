@@ -1,9 +1,11 @@
-This package provides an Emacs interface to the command-line tool ack.
+This package provides an interface to ack http://beyondgrep.com -- a
+tool like grep, designed for programmers with large trees of
+heterogeneous source code. It builds on standard packages `compile.el'
+and `ansi-color.el' and lets you seamlessly run `ack' with its large
+set of options.
 
-From <http://betterthangrep.com/>: ack is a tool like grep, designed
-for programmers with large trees of heterogeneous source code.  ack is
-written purely in Perl, and takes advantage of the power of Perl's
-regular expressions.
+Ack-like tools such as the silver search (ag) and git/hg/bzr grep are
+well supported too.
 
 Usage:
 Type `M-x ack' and provide a pattern to search.
@@ -23,9 +25,8 @@ This package does not require `--nogroup' nor `--noheading'.
 Coloring is performed using the standard library ansi-color.el.
 
 Screenshots:
-http://i.imgur.com/mrk8k.png
-http://i.imgur.com/a72Ap.png
-http://i.imgur.com/U2vFz.png
+http://i.imgur.com/VwWyzAe.png
+http://i.imgur.com/rwjC4pa.png
 
 Bugs:
 https://github.com/leoliu/ack-el/issues
