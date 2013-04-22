@@ -3,7 +3,7 @@
 ;; Copyright (C) 2011, 2013  Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
-;; Version: 1.1
+;; Version: 1.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -75,6 +75,12 @@
 
 (defvar lmc-acc 0 "Accumulator for LMC.")
 (make-variable-buffer-local 'lmc--acc)
+
+(defvar lmc-turbo nil
+  "When non-nil, evaluate the code without extra delays.
+When nil, evaluation flashes the cursor at to help you see what's going on,
+which slows it down significantly.
+Also, when nil, evaluation is interrupted when the user hits a key.")
 
 ;; Emacs-22 backward compatibility.
 (defmacro lmc--with-silent-modifications (&rest body)
@@ -535,6 +541,9 @@
   "If non-nil, memory words blink when modified."
   :type 'boolean)
 
+(defun lmc--sit-for (secs)
+  (unless lmc-turbo (sit-for sec)))
+
 (defun lmc-store-word (addr word)
   (save-excursion
     (lmc-addr->point addr)
@@ -544,17 +553,17 @@
         (when lmc-store-flash
           (lmc--with-silent-modifications
            (put-text-property mb1 (point) 'face 'region))
-          (sit-for 0.2))
+          (lmc--sit-for 0.2))
         (let ((me1 (point)))
           (insert (format "  %03d" word)) (delete-region mb1 me1))
         (when lmc-store-flash
-          (sit-for 0.1)
+          (lmc--sit-for 0.1)
           (lmc--with-silent-modifications
            (put-text-property mb1 (point) 'face 'region))
-          (sit-for 0.1)
+          (lmc--sit-for 0.1)
           (lmc--with-silent-modifications
            (put-text-property mb1 (point) 'face nil))
-          (sit-for 0.1))))))
+          (lmc--sit-for 0.1))))))
 
 (defun lmc-step ()
   "Execute one LMC instruction."
@@ -597,9 +606,9 @@
   "Run the code until hitting a HLT.
 The machine will also stop if the user presses a key."
   (interactive)
-  (while (not (or (input-pending-p) (lmc-stopped-p)))
+  (while (not (or (unless lmc-turbo (input-pending-p)) (lmc-stopped-p)))
     (lmc-step)
-    (sit-for 0.05)))
+    (lmc--sit-for 0.05)))
 
 ;;; The LMC assembly language editor.
 
