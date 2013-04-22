@@ -542,7 +542,7 @@ Also, when nil, evaluation is interrupted when the user hits a key.")
   :type 'boolean)
 
 (defun lmc--sit-for (secs)
-  (unless lmc-turbo (sit-for sec)))
+  (unless lmc-turbo (sit-for secs)))
 
 (defun lmc-store-word (addr word)
   (save-excursion
