@@ -48,11 +48,11 @@
 ;; Here is a simple example completing "foo":
 ;;
 ;; (defun company-my-backend (command &optional arg &rest ignored)
-;;   (case command
-;;     (prefix (when (looking-back "foo\\>")
+;;   (pcase command
+;;     (`prefix (when (looking-back "foo\\>")
 ;;               (match-string 0)))
-;;     (candidates (list "foobar" "foobaz" "foobarbaz"))
-;;     (meta (format "This value is named %s" arg))))
+;;     (`candidates (list "foobar" "foobaz" "foobarbaz"))
+;;     (`meta (format "This value is named %s" arg))))
 ;;
 ;; Sometimes it is a good idea to mix several back-ends together, for example to
 ;; enrich gtags with dabbrev-code results (to emulate local variables).
@@ -71,6 +71,7 @@
 
 (eval-when-compile (require 'cl))
 
+;; FIXME: Use `user-error'.
 (add-to-list 'debug-ignored-errors "^.* frontend cannot be used twice$")
 (add-to-list 'debug-ignored-errors "^Echo area cannot be used twice$")
 (add-to-list 'debug-ignored-errors "^No \\(document\\|loc\\)ation available$")
@@ -171,16 +172,16 @@
 Each front-end is a function that takes one argument.  It is called with
 one of the following arguments:
 
-'show: When the visualization should start.
+`show': When the visualization should start.
 
-'hide: When the visualization should end.
+`hide': When the visualization should end.
 
-'update: When the data has been updated.
+`update': When the data has been updated.
 
-'pre-command: Before every command that is executed while the
+`pre-command': Before every command that is executed while the
 visualization is active.
 
-'post-command: After every command that is executed while the
+`post-command': After every command that is executed while the
 visualization is active.
 
 The visualized data is stored in `company-prefix', `company-candidates',
@@ -240,27 +241,55 @@ If this many lines are not available, prefer to display the tooltip above."
                         (assq backend company-safe-backends))
                 (return t))))))
 
-(defun company-capf (command &optional arg &rest args)
+(defun company--capf-data ()
+  (let ((data (run-hook-wrapped 'completion-at-point-functions
+                                ;; Ignore misbehaving functions.
+                                #'completion--capf-wrapper 'optimist)))
+    (when (consp data) data)))
+
+(defun company-capf (command &optional arg &rest _args)
   "`company-mode' back-end using `completion-at-point-functions'.
 Requires Emacs 24.1 or newer."
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-capf))
     (prefix
-     (let ((res (run-hook-wrapped 'completion-at-point-functions
-                                  ;; Ignore misbehaving functions.
-                                  #'completion--capf-wrapper 'optimist)))
-       (when (consp res)
+     (let ((res (company--capf-data)))
+       (when res
          (if (> (nth 2 res) (point))
              'stop
            (buffer-substring-no-properties (nth 1 res) (point))))))
     (candidates
-     (let ((res (run-hook-wrapped 'completion-at-point-functions
-                                  ;; Ignore misbehaving functions.
-                                  #'completion--capf-wrapper 'optimist)))
-       (when (consp res)
-         (all-completions arg (nth 3 res)
-                          (plist-get (nthcdr 4 res) :predicate)))))))
+     (let ((res (company--capf-data)))
+       (when res
+         (let* ((table (nth 3 res))
+                (pred (plist-get (nthcdr 4 res) :predicate))
+                (meta (completion-metadata
+                      (buffer-substring (nth 1 res) (nth 2 res))
+                      table pred))
+                (sortfun (cdr (assq 'display-sort-function meta)))
+                (candidates (all-completions arg table pred)))
+           (if sortfun (funcall sortfun candidates) candidates)))))
+    (sorted
+     (let ((res (company--capf-data)))
+       (when res
+         (let ((meta (completion-metadata
+                      (buffer-substring (nth 1 res) (nth 2 res))
+                      (nth 3 res) (plist-get (nthcdr 4 res) :predicate))))
+           (cdr (assq 'display-sort-function meta))))))
+    (duplicates nil) ;Don't bother.
+    (no-cache t)     ;FIXME: Improve!
+    (meta nil)       ;FIXME: Return one-line docstring for `arg'.
+    (doc-buffer nil) ;FIXME: Return help buffer for `arg'.
+    (location nil)   ;FIXME: Return (BUF . POS) or (FILE . LINENB) of `arg'.
+    (require-match nil)            ;This should be a property of the front-end!
+    (init nil)      ;Don't bother: plenty of other ways to initialize the code.
+    (post-completion
+     (let* ((res (company--capf-data))
+            (exit-function (plist-get (nthcdr 4 res) :exit-function)))
+       (if exit-function
+           (funcall exit-function arg 'finished))))
+    ))
 
 (defcustom company-backends '(company-elisp company-nxml company-css
                               company-semantic company-clang company-eclim
@@ -281,8 +310,8 @@ The first argument is the command requested from the back-end.  It is one
 of the following:
 
 `prefix': The back-end should return the text to be completed.  It must be
-text immediately before `point'.  Returning nil passes control to the next
-back-end.  The function should return 'stop if it should complete but cannot
+text immediately before point.  Returning nil passes control to the next
+back-end.  The function should return `stop' if it should complete but cannot
 \(e.g. if it is in the middle of a string\).  If the returned value is only
 part of the prefix (e.g. the part after \"->\" in C), the back-end may return a
 cons of prefix and prefix length, which is then used in the
@@ -373,8 +402,8 @@ consider using the `post-completion' command instead."
   "If enabled, disallow non-matching input.
 This can be a function do determine if a match is required.
 
-This can be overridden by the back-end, if it returns t or 'never to
-'require-match.  `company-auto-complete' also takes precedence over this."
+This can be overridden by the back-end, if it returns t or `never' to
+`require-match'.  `company-auto-complete' also takes precedence over this."
   :type '(choice (const :tag "Off" nil)
                  (function :tag "Predicate function")
                  (const :tag "On, if user interaction took place"
@@ -645,6 +674,8 @@ keymap during active completions (`company-active-map'):
           (setq prev-dir dir
                 dir (file-name-directory (directory-file-name dir))))))))
 
+(defvar company-backend)
+
 (defun company-call-backend (&rest args)
   (if (functionp company-backend)
       (apply company-backend args)
@@ -896,10 +927,10 @@ can retrieve meta-data for them."
 (defun company-require-match-p ()
   (let ((backend-value (company-call-backend 'require-match)))
     (or (eq backend-value t)
-        (and (if (functionp company-require-match)
+        (and (not (eq backend-value 'never))
+             (if (functionp company-require-match)
                  (funcall company-require-match)
-               (eq company-require-match t))
-             (not (eq backend-value 'never))))))
+               (eq company-require-match t))))))
 
 (defun company-auto-complete-p (input)
   "Return non-nil, if input starts with punctuation or parentheses."
@@ -939,7 +970,7 @@ can retrieve meta-data for them."
        ((and (company--string-incremental-p company-prefix new-prefix)
              (company-require-match-p))
         ;; wrong incremental input, but required match
-        (backward-delete-char (length input))
+        (delete-char (- (length input)))
         (ding)
         (message "Matching input is required")
         company-candidates)
@@ -1258,7 +1289,7 @@ Don't start this directly, use `company-search-candidates' or
     (kill-local-variable 'company-search-old-selection)
     (company-enable-overriding-keymap company-active-map)))
 
-(defsubst company-search-assert-enabled ()
+(defun company-search-assert-enabled ()
   (company-assert-enabled)
   (unless company-search-mode
     (company-uninstall-map)
@@ -1426,7 +1457,7 @@ To show the number next to the candidates in some back-ends, enable
             (cons selected (company-call-backend 'meta selected))))
     (cdr company-last-metadata)))
 
-(defun company-doc-buffer (&optional string)
+(defun company-doc-buffer (&optional _string)
   (with-current-buffer (get-buffer-create "*Company meta-data*")
     (erase-buffer)
     (current-buffer)))
@@ -1531,17 +1562,18 @@ completes the input.
 
 Example:
 \(company-begin-with '\(\"foo\" \"foobar\" \"foobarbaz\"\)\)"
+  ;; FIXME: Shouldn't `company-begin-with-marker' be removed and replaced
+  ;; by a lexical variable?
   (setq company-begin-with-marker (copy-marker (point) t))
   (company-begin-backend
-   `(lambda (command &optional arg &rest ignored)
-      (cond
-       ((eq command 'prefix)
-        (when (equal (point) (marker-position company-begin-with-marker))
-          (buffer-substring ,(- (point) (or prefix-length 0)) (point))))
-       ((eq command 'candidates)
-        (all-completions arg ',candidates))
-       ((eq command 'require-match)
-        ,require-match)))
+   (lambda (command &optional arg &rest ignored)
+     (case command
+       (prefix
+       (when (equal (point) (marker-position company-begin-with-marker))
+         (buffer-substring (- company-begin-with-marker (or prefix-length 0))
+                           (point))))
+       (candidates (all-completions arg candidates))
+       (require-match require-match)))
    callback))
 
 ;;; pseudo-tooltip ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1649,7 +1681,7 @@ Example:
   (let (new)
     (when align-top
       ;; untouched lines first
-      (dotimes (i (- (length old) (length lines)))
+      (dotimes (_ (- (length old) (length lines)))
         (push (pop old) new)))
     ;; length into old lines.
     (while old
@@ -1691,7 +1723,7 @@ Example:
           len (min limit len)
           lines-copy lines)
 
-    (dotimes (i len)
+    (dotimes (_ len)
       (setq width (max (length (pop lines-copy)) width)))
     (setq width (min width (window-width)))
 
@@ -1780,8 +1812,8 @@ Returns a negative number if the tooltip should be displayed above point."
       (company-pseudo-tooltip-show (1+ (cdr col-row)) (car col-row)
                                    company-selection))))
 
-(defun company-pseudo-tooltip-edit (lines selection)
-  (let ((column (overlay-get company-pseudo-tooltip-overlay 'company-column))
+(defun company-pseudo-tooltip-edit (_lines selection)
+  (let (;;(column (overlay-get company-pseudo-tooltip-overlay 'company-column))
         (height (overlay-get company-pseudo-tooltip-overlay 'company-height)))
     (overlay-put company-pseudo-tooltip-overlay 'company-before
                  (apply 'company--replacement-string
