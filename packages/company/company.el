@@ -4,9 +4,9 @@
 
 ;; Author: Nikolaj Schumacher
 ;; Maintainer: Dmitry Gutov <dgutov@yandex.ru>
-;; Version: 0.6.8
+;; Version: 0.6.9
 ;; Keywords: abbrev, convenience, matching
-;; URL: http://company-mode.github.com/
+;; URL: http://company-mode.github.io/
 ;; Compatibility: GNU Emacs 22.x, GNU Emacs 23.x, GNU Emacs 24.x
 
 ;; This file is part of GNU Emacs.
@@ -48,11 +48,11 @@
 ;; Here is a simple example completing "foo":
 ;;
 ;; (defun company-my-backend (command &optional arg &rest ignored)
-;;   (pcase command
-;;     (`prefix (when (looking-back "foo\\>")
+;;   (case command
+;;     (prefix (when (looking-back "foo\\>")
 ;;               (match-string 0)))
-;;     (`candidates (list "foobar" "foobaz" "foobarbaz"))
-;;     (`meta (format "This value is named %s" arg))))
+;;     (candidates (list "foobar" "foobaz" "foobarbaz"))
+;;     (meta (format "This value is named %s" arg))))
 ;;
 ;; Sometimes it is a good idea to mix several back-ends together, for example to
 ;; enrich gtags with dabbrev-code results (to emulate local variables).
@@ -213,6 +213,7 @@ If this many lines are not available, prefer to display the tooltip above."
 
 (defvar company-safe-backends
   '((company-abbrev . "Abbrev")
+    (company-capf . "completion-at-point-functions")
     (company-clang . "Clang")
     (company-css . "CSS")
     (company-dabbrev . "dabbrev for plain text")
@@ -241,56 +242,6 @@ If this many lines are not available, prefer to display the tooltip above."
                         (assq backend company-safe-backends))
                 (return t))))))
 
-(defun company--capf-data ()
-  (let ((data (run-hook-wrapped 'completion-at-point-functions
-                                ;; Ignore misbehaving functions.
-                                #'completion--capf-wrapper 'optimist)))
-    (when (consp data) data)))
-
-(defun company-capf (command &optional arg &rest _args)
-  "`company-mode' back-end using `completion-at-point-functions'.
-Requires Emacs 24.1 or newer."
-  (interactive (list 'interactive))
-  (case command
-    (interactive (company-begin-backend 'company-capf))
-    (prefix
-     (let ((res (company--capf-data)))
-       (when res
-         (if (> (nth 2 res) (point))
-             'stop
-           (buffer-substring-no-properties (nth 1 res) (point))))))
-    (candidates
-     (let ((res (company--capf-data)))
-       (when res
-         (let* ((table (nth 3 res))
-                (pred (plist-get (nthcdr 4 res) :predicate))
-                (meta (completion-metadata
-                      (buffer-substring (nth 1 res) (nth 2 res))
-                      table pred))
-                (sortfun (cdr (assq 'display-sort-function meta)))
-                (candidates (all-completions arg table pred)))
-           (if sortfun (funcall sortfun candidates) candidates)))))
-    (sorted
-     (let ((res (company--capf-data)))
-       (when res
-         (let ((meta (completion-metadata
-                      (buffer-substring (nth 1 res) (nth 2 res))
-                      (nth 3 res) (plist-get (nthcdr 4 res) :predicate))))
-           (cdr (assq 'display-sort-function meta))))))
-    (duplicates nil) ;Don't bother.
-    (no-cache t)     ;FIXME: Improve!
-    (meta nil)       ;FIXME: Return one-line docstring for `arg'.
-    (doc-buffer nil) ;FIXME: Return help buffer for `arg'.
-    (location nil)   ;FIXME: Return (BUF . POS) or (FILE . LINENB) of `arg'.
-    (require-match nil)            ;This should be a property of the front-end!
-    (init nil)      ;Don't bother: plenty of other ways to initialize the code.
-    (post-completion
-     (let* ((res (company--capf-data))
-            (exit-function (plist-get (nthcdr 4 res) :exit-function)))
-       (if exit-function
-           (funcall exit-function arg 'finished))))
-    ))
-
 (defcustom company-backends '(company-elisp company-nxml company-css
                               company-semantic company-clang company-eclim
                               company-xcode company-ropemacs
@@ -309,13 +260,12 @@ Each back-end is a function that takes a variable number of arguments.
 The first argument is the command requested from the back-end.  It is one
 of the following:
 
-`prefix': The back-end should return the text to be completed.  It must be
-text immediately before point.  Returning nil passes control to the next
-back-end.  The function should return `stop' if it should complete but cannot
-\(e.g. if it is in the middle of a string\).  If the returned value is only
-part of the prefix (e.g. the part after \"->\" in C), the back-end may return a
-cons of prefix and prefix length, which is then used in the
-`company-minimum-prefix-length' test.
+`prefix': The back-end should return the text to be completed.  It must be text
+immediately before point.  Returning nil passes control to the next back-end.
+The function should return `stop' if it should complete but cannot \(e.g. if it
+is in the middle of a string\).  Instead of a string, the back-end may return a
+cons where car is the prefix and cdr is used in `company-minimum-prefix-length'
+test. It's either number or t, in which case the test automatically succeeds.
 
 `candidates': The second argument is the prefix to be completed.  The
 return value should be a list of candidates that start with the prefix.
@@ -635,6 +585,9 @@ keymap during active completions (`company-active-map'):
 
 ;;; backends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defvar company-backend nil)
+(make-variable-buffer-local 'company-backend)
+
 (defun company-grab (regexp &optional expression limit)
   (when (looking-back regexp limit)
     (or (match-string-no-properties (or expression 0)) "")))
@@ -674,8 +627,6 @@ keymap during active completions (`company-active-map'):
           (setq prev-dir dir
                 dir (file-name-directory (directory-file-name dir))))))))
 
-(defvar company-backend)
-
 (defun company-call-backend (&rest args)
   (if (functionp company-backend)
       (apply company-backend args)
@@ -701,9 +652,6 @@ keymap during active completions (`company-active-map'):
              (return value))))))))
 
 ;;; completion mechanism ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defvar company-backend nil)
-(make-variable-buffer-local 'company-backend)
 
 (defvar company-prefix nil)
 (make-variable-buffer-local 'company-prefix)
@@ -982,8 +930,9 @@ can retrieve meta-data for them."
 (defun company--good-prefix-p (prefix)
   (and (or (company-explicit-action-p)
            (unless (eq prefix 'stop)
-             (>= (or (cdr-safe prefix) (length prefix))
-                 company-minimum-prefix-length)))
+             (or (eq (cdr-safe prefix) t)
+                 (>= (or (cdr-safe prefix) (length prefix))
+                     company-minimum-prefix-length))))
        (stringp (or (car-safe prefix) prefix))))
 
 (defun company--continue ()
@@ -1359,14 +1308,48 @@ and invoke the normal binding."
     (company-abort)
     (company--unread-last-input)))
 
+(defvar company-pseudo-tooltip-overlay)
+
+(defvar company-tooltip-offset)
+
+(defun company--inside-tooltip-p (event-col-row row height)
+  (let* ((ovl company-pseudo-tooltip-overlay)
+         (column (overlay-get ovl 'company-column))
+         (width (overlay-get ovl 'company-width))
+         (evt-col (car event-col-row))
+         (evt-row (cdr event-col-row)))
+    (and (>= evt-col column)
+         (< evt-col (+ column width))
+         (if (> height 0)
+             (and (> evt-row row)
+                  (<= evt-row (+ row height) ))
+           (and (< evt-row row)
+                (>= evt-row (+ row height)))))))
+
 (defun company-select-mouse (event)
   "Select the candidate picked by the mouse."
   (interactive "e")
-  (when (nth 4 (event-start event))
-    (company-set-selection (- (cdr (posn-actual-col-row (event-start event)))
-                              (company--row)
-                              1))
-    t))
+  (let ((event-col-row (posn-actual-col-row (event-start event)))
+        (ovl-row (company--row))
+        (ovl-height (and company-pseudo-tooltip-overlay
+                         (min (overlay-get company-pseudo-tooltip-overlay
+                                           'company-height)
+                              company-candidates-length))))
+    (if (and ovl-height
+             (company--inside-tooltip-p event-col-row ovl-row ovl-height))
+        (progn
+          (company-set-selection (+ (cdr event-col-row)
+                                    (if (zerop company-tooltip-offset)
+                                        -1
+                                      (- company-tooltip-offset 2))
+                                    (- ovl-row)
+                                    (if (< ovl-height 0)
+                                        (- 1 ovl-height)
+                                      0)))
+          t)
+      (company-abort)
+      (company--unread-last-input)
+      nil)))
 
 (defun company-complete-mouse (event)
   "Complete the candidate picked by the mouse."
@@ -1562,18 +1545,19 @@ completes the input.
 
 Example:
 \(company-begin-with '\(\"foo\" \"foobar\" \"foobarbaz\"\)\)"
-  ;; FIXME: Shouldn't `company-begin-with-marker' be removed and replaced
-  ;; by a lexical variable?
+  ;; FIXME: When Emacs 23 is no longer a concern, replace
+  ;; `company-begin-with-marker' with a lexical variable; use a lexical closure.
   (setq company-begin-with-marker (copy-marker (point) t))
   (company-begin-backend
-   (lambda (command &optional arg &rest ignored)
-     (case command
-       (prefix
-       (when (equal (point) (marker-position company-begin-with-marker))
-         (buffer-substring (- company-begin-with-marker (or prefix-length 0))
-                           (point))))
-       (candidates (all-completions arg candidates))
-       (require-match require-match)))
+   `(lambda (command &optional arg &rest ignored)
+      (cond
+       ((eq command 'prefix)
+        (when (equal (point) (marker-position company-begin-with-marker))
+          (buffer-substring ,(- (point) (or prefix-length 0)) (point))))
+       ((eq command 'candidates)
+        (all-completions arg ',candidates))
+       ((eq command 'require-match)
+        ,require-match)))
    callback))
 
 ;;; pseudo-tooltip ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1654,12 +1638,13 @@ Example:
 (defun company-buffer-lines (beg end)
   (goto-char beg)
   (let (lines)
-    (while (and (= 1 (vertical-motion 1))
-                (<= (point) end))
-      (push (buffer-substring beg (min end (1- (point)))) lines)
-      (setq beg (point)))
-    (unless (eq beg end)
-      (push (buffer-substring beg end) lines))
+    (while (< (point) end)
+      (let ((bol (point)))
+        ;; A visual line can contain several physical lines (e.g. with outline's
+        ;; folding overlay).  Take only the first one.
+        (re-search-forward "$")
+        (push (buffer-substring bol (min end (point))) lines))
+      (vertical-motion 1))
     (nreverse lines)))
 
 (defsubst company-modify-line (old new offset)
@@ -1782,6 +1767,10 @@ Returns a negative number if the tooltip should be displayed above point."
     (let* ((height (company--pseudo-tooltip-height))
            above)
 
+      (when (and header-line-format
+                 (version< "24" emacs-version))
+        (decf row))
+
       (when (< height 0)
         (setq row (+ row height -1)
               above t))
@@ -1798,10 +1787,11 @@ Returns a negative number if the tooltip should be displayed above point."
 
         (setq company-pseudo-tooltip-overlay ov)
         (overlay-put ov 'company-replacement-args args)
-        (overlay-put ov 'company-before
-                     (apply 'company--replacement-string
-                            (company--create-lines selection (abs height))
-                            args))
+
+        (let ((lines (company--create-lines selection (abs height))))
+          (overlay-put ov 'company-before
+                       (apply 'company--replacement-string lines args))
+          (overlay-put ov 'company-width (string-width (car lines))))
 
         (overlay-put ov 'company-column column)
         (overlay-put ov 'company-height height)))))
@@ -1812,9 +1802,8 @@ Returns a negative number if the tooltip should be displayed above point."
       (company-pseudo-tooltip-show (1+ (cdr col-row)) (car col-row)
                                    company-selection))))
 
-(defun company-pseudo-tooltip-edit (_lines selection)
-  (let (;;(column (overlay-get company-pseudo-tooltip-overlay 'company-column))
-        (height (overlay-get company-pseudo-tooltip-overlay 'company-height)))
+(defun company-pseudo-tooltip-edit (selection)
+  (let ((height (overlay-get company-pseudo-tooltip-overlay 'company-height)))
     (overlay-put company-pseudo-tooltip-overlay 'company-before
                  (apply 'company--replacement-string
                         (company--create-lines selection (abs height))
@@ -1834,6 +1823,8 @@ Returns a negative number if the tooltip should be displayed above point."
 (defun company-pseudo-tooltip-unhide ()
   (when company-pseudo-tooltip-overlay
     (overlay-put company-pseudo-tooltip-overlay 'invisible t)
+    ;; Beat outline's folding overlays, at least.
+    (overlay-put company-pseudo-tooltip-overlay 'priority 1)
     (overlay-put company-pseudo-tooltip-overlay 'before-string
                  (overlay-get company-pseudo-tooltip-overlay 'company-before))
     (overlay-put company-pseudo-tooltip-overlay 'window (selected-window))))
@@ -1866,8 +1857,7 @@ Returns a negative number if the tooltip should be displayed above point."
     (hide (company-pseudo-tooltip-hide)
           (setq company-tooltip-offset 0))
     (update (when (overlayp company-pseudo-tooltip-overlay)
-              (company-pseudo-tooltip-edit company-candidates
-                                           company-selection)))))
+              (company-pseudo-tooltip-edit company-selection)))))
 
 (defun company-pseudo-tooltip-unless-just-one-frontend (command)
   "`company-pseudo-tooltip-frontend', but not shown for single candidates."
