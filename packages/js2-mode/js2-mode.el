@@ -7,7 +7,7 @@
 ;;         Dmitry Gutov <dgutov@yandex.ru>
 ;; URL:  https://github.com/mooz/js2-mode/
 ;;       http://code.google.com/p/js2-mode/
-;; Version: 20130307
+;; Version: 20130510
 ;; Keywords: languages, javascript
 ;; Package-Requires: ((emacs "24.1"))
 
@@ -55,6 +55,10 @@
 ;; you must add it to the appropriate major-mode hook.  Normally this would be:
 
 ;;   (add-hook 'js-mode-hook 'js2-minor-mode)
+
+;; You may also want to hook it in for shell scripts running via node.js:
+
+;;   (add-to-list 'interpreter-mode-alist '("node" . js2-mode))
 
 ;; To customize how it works:
 ;;   M-x customize-group RET js2-mode RET
@@ -165,7 +169,10 @@
             DocumentRange Range RangeException
 
             ;; W3C XML
-            XPathResult XMLHttpRequest))
+            XPathResult XMLHttpRequest
+
+            ;; console object.  Provided by at least Chrome and Firefox.
+            console))
   "Browser externs.
 You can cause these to be included or excluded with the custom
 variable `js2-include-browser-externs'.")
@@ -186,6 +193,15 @@ Set `js2-include-rhino-externs' to t to include them.")
             console exports global module process setInterval setTimeout))
   "Node.js externs.
 Set `js2-include-node-externs' to t to include them.")
+
+(defvar js2-typed-array-externs
+  (mapcar 'symbol-name
+          '(ArrayBuffer Uint8ClampedArray DataView
+            Int8Array Uint8Array Int16Array Uint16Array Int32Array Uint32Array
+            Float32Array Float64Array))
+  "Khronos typed array externs. Available in most modern browsers and
+in node.js >= 0.6. If `js2-include-node-externs' or `js2-include-browser-externs'
+are enabled, these will also be included.")
 
 ;;; Variables
 
@@ -842,6 +858,9 @@ Next, you can add a function to `js2-mode-hook' that adds additional
 externs appropriate for the specific file, perhaps based on its path.
 These should go in `js2-additional-externs', which is buffer-local.
 
+Third, you can use JSLint's global declaration, as long as
+`js2-include-jslint-globals' is non-nil, which see.
+
 Finally, you can add a function to `js2-post-parse-callbacks',
 which is called after parsing completes, and `js2-mode-ast' is bound to
 the root of the parse tree.  At this stage you can set up an AST
@@ -1090,8 +1109,11 @@ another file, or you've got a potential bug."
   :type 'boolean
   :group 'js2-mode)
 
-(defcustom js2-auto-insert-catch-block t
-  "Non-nil to insert matching catch block on open-curly after `try'."
+(defcustom js2-include-jslint-globals t
+  "Non-nil to include the identifiers from JSLint global
+declaration (see http://www.jslint.com/lint.html#global) in the
+buffer-local externs list.  See `js2-additional-externs' for more
+information."
   :type 'boolean
   :group 'js2-mode)
 
@@ -4601,7 +4623,7 @@ You should use `js2-print-tree' instead of this function."
         (let ((expr (js2-expr-stmt-node-expr node)))
           (or (js2-node-has-side-effects expr)
               (when (js2-string-node-p expr)
-                (string= "use strict" (js2-string-node-value expr))))))
+                (member (js2-string-node-value expr) '("use strict" "use asm"))))))
        ((= tt js2-COMMA)
         (js2-node-has-side-effects (js2-infix-node-right node)))
        ((or (= tt js2-AND)
@@ -6402,6 +6424,42 @@ it is considered declared."
                               'js2-external-variable))))
     (setq js2-recorded-identifiers nil)))
 
+(defun js2-set-default-externs ()
+  "Set the value of `js2-default-externs' based on the various
+`js2-include-?-externs' variables."
+  (setq js2-default-externs
+        (append js2-ecma-262-externs
+                (if js2-include-browser-externs js2-browser-externs)
+                (if js2-include-rhino-externs js2-rhino-externs)
+                (if js2-include-node-externs js2-node-externs)
+                (if (or js2-include-browser-externs js2-include-node-externs)
+                    js2-typed-array-externs))))
+
+(defun js2-apply-jslint-globals ()
+  (setq js2-additional-externs
+        (nconc (js2-get-jslint-globals)
+               js2-additional-externs)))
+
+(defun js2-get-jslint-globals ()
+  (loop for node in (js2-ast-root-comments js2-mode-ast)
+        when (and (eq 'block (js2-comment-node-format node))
+                  (save-excursion
+                    (goto-char (js2-node-abs-pos node))
+                    (looking-at "/\\*global ")))
+        append (js2-get-jslint-globals-in
+                (match-end 0)
+                (js2-node-abs-end node))))
+
+(defun js2-get-jslint-globals-in (beg end)
+  (let (res)
+    (save-excursion
+      (goto-char beg)
+      (while (re-search-forward js2-mode-identifier-re end t)
+        (let ((match (match-string 0)))
+          (unless (member match '("true" "false"))
+            (push match res)))))
+    (nreverse res)))
+
 ;;; IMenu support
 
 ;; We currently only support imenu, but eventually should support speedbar and
@@ -7109,8 +7167,7 @@ Scanner should be initialized."
     ;; Give extensions a chance to muck with things before highlighting starts.
     (let ((js2-additional-externs js2-additional-externs))
       (save-excursion
-        (dolist (callback js2-post-parse-callbacks)
-          (funcall callback)))
+        (run-hooks 'js2-post-parse-callbacks))
       (js2-highlight-undeclared-vars))
     root))
 
@@ -9593,11 +9650,10 @@ to a multiline declaration statement.  See `js2-pretty-multiline-declarations'."
                         (js2-backward-sws)
                         (or (eq (char-before) ?,)
                             (and (not (eq (char-before) ?\;))
-                                 (and
-                                  (prog2 (skip-syntax-backward ".")
-                                      (looking-at js2-indent-operator-re)
-                                    (js2-backward-sws))
-                                  (not (eq (char-before) ?\;))))
+                                 (prog2 (skip-syntax-backward ".")
+                                     (looking-at js2-indent-operator-re)
+                                   (js2-backward-sws))
+                                 (not (eq (char-before) ?\;)))
                             (js2-same-line pos)))))
           (condition-case err
               (backward-sexp)
@@ -10043,11 +10099,7 @@ highlighting features of `js2-mode'."
   (set (make-local-variable 'max-lisp-eval-depth)
        (max max-lisp-eval-depth 3000))
   (setq next-error-function #'js2-next-error)
-  (setq js2-default-externs
-        (append js2-ecma-262-externs
-                (if js2-include-browser-externs js2-browser-externs)
-                (if js2-include-rhino-externs js2-rhino-externs)
-                (if js2-include-node-externs js2-node-externs)))
+  (js2-set-default-externs)
   ;; Experiment:  make reparse-delay longer for longer files.
   (if (plusp js2-dynamic-idle-timer-adjust)
       (setq js2-idle-timer-delay
@@ -10058,6 +10110,8 @@ highlighting features of `js2-mode'."
   (set (make-local-variable 'js2-highlight-level) 0) ; no syntax highlighting
   (add-hook 'after-change-functions #'js2-minor-mode-edit nil t)
   (add-hook 'change-major-mode-hook #'js2-minor-mode-exit nil t)
+  (when js2-include-jslint-globals
+    (add-hook 'js2-post-parse-callbacks 'js2-apply-jslint-globals nil t))
   (js2-reparse))
 
 (defun js2-minor-mode-exit ()
@@ -10069,6 +10123,7 @@ highlighting features of `js2-mode'."
     (delete-overlay js2-mode-node-overlay)
     (setq js2-mode-node-overlay nil))
   (js2-remove-overlays)
+  (remove-hook 'js2-post-parse-callbacks 'js2-apply-jslint-globals t)
   (setq js2-mode-ast nil))
 
 (defvar js2-source-buffer nil "Linked source buffer for diagnostics view")
@@ -10228,12 +10283,6 @@ Selecting an error will jump it to the corresponding source-buffer error.
     (make-local-variable 'adaptive-fill-regexp)
     (c-setup-paragraph-variables))
 
-  (setq js2-default-externs
-        (append js2-ecma-262-externs
-                (if js2-include-browser-externs js2-browser-externs)
-                (if js2-include-rhino-externs js2-rhino-externs)
-                (if js2-include-node-externs js2-node-externs)))
-
   (setq font-lock-defaults '(nil t))
 
   ;; Experiment:  make reparse-delay longer for longer files.
@@ -10255,6 +10304,12 @@ Selecting an error will jump it to the corresponding source-buffer error.
         js2-mode-comments-hidden nil
         js2-mode-buffer-dirty-p t
         js2-mode-parsing nil)
+
+  (js2-set-default-externs)
+
+  (when js2-include-jslint-globals
+    (add-hook 'js2-post-parse-callbacks 'js2-apply-jslint-globals nil t))
+
   (js2-reparse))
 
 (defun js2-mode-exit ()
