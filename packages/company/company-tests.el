@@ -179,33 +179,51 @@
         (company-call 'open-line 1)
         (should (eq 2 (overlay-start company-pseudo-tooltip-overlay)))))))
 
-(defun company-test-pseudo-tooltip-overlay-show ()
-  (save-window-excursion
-    (set-window-buffer nil (current-buffer))
-    (insert "aaaa\n bb\nccccc\nddd")
-    (search-backward "bb")
-    (let ((col-row (company--col-row))
-          (company-candidates-length 2)
-          (company-candidates '("123" "45")))
-      (company-pseudo-tooltip-show (cdr col-row) (car col-row) 0)
-      (let ((ov company-pseudo-tooltip-overlay))
-        (should (eq (overlay-get ov 'company-width) 3))
-        ;; FIXME: Make it 2?
-        (should (eq (overlay-get ov 'company-height) 10))
-        (should (eq (overlay-get ov 'company-column) (car col-row)))
-        (should (string= (overlay-get ov 'company-before)
-                         " 123\nc45 c\nddd\n"))))))
-
 (ert-deftest company-pseudo-tooltip-overlay-show ()
   :tags '(interactive)
   (with-temp-buffer
-    (company-test-pseudo-tooltip-overlay-show)))
+    (save-window-excursion
+    (set-window-buffer nil (current-buffer))
+    (insert "aaaa\n bb\nccccc\nddd")
+    (search-backward "bb")
+    (let ((col (company--column))
+          (company-candidates-length 2)
+          (company-candidates '("123" "45")))
+      (company-pseudo-tooltip-show (company--row) col 0)
+      (let ((ov company-pseudo-tooltip-overlay))
+        (should (eq (overlay-get ov 'company-width) 3))
+        ;; FIXME: Make it 2?
+        (should (eq (overlay-get ov 'company-height) company-tooltip-limit))
+        (should (eq (overlay-get ov 'company-column) col))
+        (should (string= (overlay-get ov 'company-before)
+                         " 123\nc45 c\nddd\n")))))))
 
-(ert-deftest company-pseudo-tooltip-overlay-show-with-header-line ()
-  :tags '(interactive)
+(ert-deftest company-column-with-composition ()
   (with-temp-buffer
-    (setq header-line-format "foo bar")
-    (company-test-pseudo-tooltip-overlay-show)))
+    (insert "lambda ()")
+    (compose-region 1 (1+ (length "lambda")) "\\")
+    (should (= (company--column) 4))))
+
+(ert-deftest company-column-with-line-prefix ()
+  (with-temp-buffer
+    (insert "foo")
+    (put-text-property (point-min) (point) 'line-prefix "  ")
+    (should (= (company--column) 5))))
+
+(ert-deftest company-modify-line-with-line-prefix ()
+  (let ((str (propertize "foobar" 'line-prefix "-*-")))
+    (should (equal-including-properties
+             (company-modify-line str "zz" 4)
+             "-*-fzzbar"))
+    (should (equal-including-properties
+             (company-modify-line str "zzxx" 1)
+             "-zzxxobar"))
+    (should (equal-including-properties
+             (company-modify-line str "xx" 0)
+             "xx-foobar"))
+    (should (equal-including-properties
+             (company-modify-line str "zz" 10)
+             "-*-foobar zz"))))
 
 ;;; Template
 

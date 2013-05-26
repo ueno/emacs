@@ -22,8 +22,6 @@
 
 ;;; Commentary:
 ;;
-;; Requires pymacs Emacs package (you can get it from Marmalade),
-;; and on Python side: pymacs, rope, ropemacs and ropemode.
 
 ;;; Code:
 
@@ -45,9 +43,7 @@
   "Return buffer with docstring of CANDIDATE if it is available."
   (let ((doc (company-with-candidate-inserted candidate (rope-get-doc))))
     (when doc
-      (with-current-buffer (company-doc-buffer)
-        (insert doc)
-        (current-buffer)))))
+      (company-doc-buffer doc))))
 
 (defun company-ropemacs-location (candidate)
   "Return location of CANDIDATE in cons form (FILE . LINE) if it is available."
@@ -57,7 +53,10 @@
       (cons (elt location 0) (elt location 1)))))
 
 (defun company-ropemacs (command &optional arg &rest ignored)
-  "`company-mode' completion back-end for ropemacs."
+  "`company-mode' completion back-end for ropemacs.
+
+Depends on third-party code: Pymacs (both Python and Emacs packages),
+rope, ropemacs and ropemode."
   (interactive (list 'interactive))
   (case command
     (init (when (and (derived-mode-p 'python-mode)

@@ -4,7 +4,7 @@
 
 ;; Author: Nikolaj Schumacher
 ;; Maintainer: Dmitry Gutov <dgutov@yandex.ru>
-;; Version: 0.6.9
+;; Version: 0.6.10
 ;; Keywords: abbrev, convenience, matching
 ;; URL: http://company-mode.github.io/
 ;; Compatibility: GNU Emacs 22.x, GNU Emacs 23.x, GNU Emacs 24.x
@@ -260,20 +260,21 @@ Each back-end is a function that takes a variable number of arguments.
 The first argument is the command requested from the back-end.  It is one
 of the following:
 
-`prefix': The back-end should return the text to be completed.  It must be text
-immediately before point.  Returning nil passes control to the next back-end.
-The function should return `stop' if it should complete but cannot \(e.g. if it
-is in the middle of a string\).  Instead of a string, the back-end may return a
-cons where car is the prefix and cdr is used in `company-minimum-prefix-length'
-test. It's either number or t, in which case the test automatically succeeds.
+`prefix': The back-end should return the text to be completed.  It must be
+text immediately before point.  Returning nil passes control to the next
+back-end.  The function should return `stop' if it should complete but
+cannot \(e.g. if it is in the middle of a string\).  Instead of a string,
+the back-end may return a cons where car is the prefix and cdr is used in
+`company-minimum-prefix-length' test. It's either number or t, in which
+case the test automatically succeeds.
 
 `candidates': The second argument is the prefix to be completed.  The
 return value should be a list of candidates that start with the prefix.
 
 Optional commands:
 
-`sorted': The back-end may return t here to indicate that the candidates
-are sorted and will not need to be sorted again.
+`sorted': Return t here to indicate that the candidates are sorted and will
+not need to be sorted again.
 
 `duplicates': If non-nil, company will take care of removing duplicates
 from the list.
@@ -282,29 +283,29 @@ from the list.
 progresses, unless the back-end returns t for this command.  The second
 argument is the latest prefix.
 
-`meta': The second argument is a completion candidate.  The back-end should
-return a (short) documentation string for it.
+`meta': The second argument is a completion candidate.  Return a (short)
+documentation string for it.
 
-`doc-buffer': The second argument is a completion candidate.
-The back-end should create a buffer (preferably with `company-doc-buffer'),
-fill it with documentation and return it.
+`doc-buffer': The second argument is a completion candidate.  Return a
+buffer with documentation for it.  Preferably use `company-doc-buffer',
 
-`location': The second argument is a completion candidate.  The back-end can
-return the cons of buffer and buffer location, or of file and line
-number where the completion candidate was defined.
+`location': The second argument is a completion candidate.  Return the cons
+of buffer and buffer location, or of file and line number where the
+completion candidate was defined.
 
-`require-match': If this value is t, the user is not allowed to enter anything
-not offered as a candidate.  Use with care!  The default value nil gives the
-user that choice with `company-require-match'.  Return value 'never overrides
-that option the other way around.
+`require-match': If this returns t, the user is not allowed to enter
+anything not offered as a candidate.  Use with care!  The default value nil
+gives the user that choice with `company-require-match'.  Return value
+`never' overrides that option the other way around.
 
-`init': Called once for each buffer, the back-end can check for external
-programs and files and load any required libraries.  Raising an error here will
-show up in message log once, and the backend will not be used for completion.
+`init': Called once for each buffer. The back-end can check for external
+programs and files and load any required libraries.  Raising an error here
+will show up in message log once, and the back-end will not be used for
+completion.
 
-`post-completion': Called after a completion candidate has been inserted into
-the buffer.  The second argument is the candidate.  Can be used to modify it,
-e.g. to expand a snippet.
+`post-completion': Called after a completion candidate has been inserted
+into the buffer.  The second argument is the candidate.  Can be used to
+modify it, e.g. to expand a snippet.
 
 The back-end should return nil for all commands it does not support or
 does not know about.  It should also be callable interactively and use
@@ -340,8 +341,8 @@ aborted manually."
   "Hook run when company successfully completes.
 The hook is called with the selected candidate as an argument.
 
-If you indend to use it to post-process candidates from a specific back-end,
-consider using the `post-completion' command instead."
+If you indend to use it to post-process candidates from a specific
+back-end, consider using the `post-completion' command instead."
   :type 'hook)
 
 (defcustom company-minimum-prefix-length 3
@@ -362,8 +363,8 @@ This can be overridden by the back-end, if it returns t or `never' to
 
 (defcustom company-auto-complete nil
   "Determines when to auto-complete.
-If this is enabled, all characters from `company-auto-complete-chars' complete
-the selected completion.  This can also be a function."
+If this is enabled, all characters from `company-auto-complete-chars'
+complete the selected completion.  This can also be a function."
   :type '(choice (const :tag "Off" nil)
                  (function :tag "Predicate function")
                  (const :tag "On, if user interaction took place"
@@ -372,8 +373,8 @@ the selected completion.  This can also be a function."
 
 (defcustom company-auto-complete-chars '(?\  ?\) ?.)
   "Determines which characters trigger an automatic completion.
-See `company-auto-complete'.  If this is a string, each string character causes
-completion.  If it is a list of syntax description characters (see
+See `company-auto-complete'.  If this is a string, each string character
+causes completion.  If it is a list of syntax description characters (see
 `modify-syntax-entry'), all characters with that syntax auto-complete.
 
 This can also be a function, which is called with the new input and should
@@ -410,8 +411,8 @@ immediately when a prefix of `company-minimum-prefix-length' is reached."
   "A list of commands following which company will start completing.
 If this is t, it will complete after any command.  See `company-idle-delay'.
 
-Alternatively any command with a non-nil 'company-begin property is treated as
-if it was on this list."
+Alternatively any command with a non-nil `company-begin' property is treated
+as if it was on this list."
   :type '(choice (const :tag "Any command" t)
                  (const :tag "Self insert command" '(self-insert-command))
                  (repeat :tag "Commands" function)))
@@ -501,9 +502,9 @@ Completions can be searched with `company-search-candidates' or
 `company-filter-candidates'.  These can be used while completion is
 inactive, as well.
 
-The completion data is retrieved using `company-backends' and displayed using
-`company-frontends'.  If you want to start a specific back-end, call it
-interactively or use `company-begin-backend'.
+The completion data is retrieved using `company-backends' and displayed
+using `company-frontends'.  If you want to start a specific back-end, call
+it interactively or use `company-begin-backend'.
 
 regular keymap (`company-mode-map'):
 
@@ -571,17 +572,23 @@ keymap during active completions (`company-active-map'):
 (defun company-input-noop ()
   (push 31415926 unread-command-events))
 
-;; Hack:
-;; posn-col-row is incorrect in older Emacsen when line-spacing is set
-(defun company--col-row (&optional pos)
-  (let ((posn (posn-at-point pos)))
-    (cons (car (posn-col-row posn)) (cdr (posn-actual-col-row posn)))))
+(defun company--column (&optional pos)
+  (save-excursion
+    (when pos (goto-char pos))
+    (let ((pt (point)))
+      (save-restriction
+        (+ (save-excursion
+             (vertical-motion 0)
+             (narrow-to-region (point) pt)
+             (let ((prefix (get-text-property (point) 'line-prefix)))
+               (if prefix (length prefix) 0)))
+           (current-column))))))
 
-(defsubst company--column (&optional pos)
-  (car (posn-col-row (posn-at-point pos))))
-
-(defsubst company--row (&optional pos)
-  (cdr (posn-actual-col-row (posn-at-point pos))))
+(defun company--row (&optional pos)
+  (save-excursion
+    (when pos (goto-char pos))
+    (count-screen-lines (window-start)
+                        (progn (vertical-motion 0) (point)))))
 
 ;;; backends ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -717,7 +724,7 @@ can retrieve meta-data for them."
   (or company--explicit-action
       company-selection-changed))
 
-(defsubst company-reformat (candidate)
+(defun company-reformat (candidate)
   ;; company-ispell needs this, because the results are always lower-case
   ;; It's mory efficient to fix it only when they are displayed.
   (concat company-prefix (substring candidate (length company-prefix))))
@@ -735,14 +742,14 @@ can retrieve meta-data for them."
            (and (symbolp this-command) (get this-command 'company-begin)))
        (not (and transient-mark-mode mark-active))))
 
-(defsubst company-call-frontends (command)
+(defun company-call-frontends (command)
   (dolist (frontend company-frontends)
     (condition-case err
         (funcall frontend command)
       (error (error "Company: Front-end %s error \"%s\" on command %s"
                     frontend (error-message-string err) command)))))
 
-(defsubst company-set-selection (selection &optional force-update)
+(defun company-set-selection (selection &optional force-update)
   (setq selection (max 0 (min (1- company-candidates-length) selection)))
   (when (or force-update (not (equal selection company-selection)))
     (setq company-selection selection
@@ -1254,8 +1261,8 @@ Don't start this directly, use `company-search-candidates' or
 
 Regular characters are appended to the search string.
 
-The command `company-search-kill-others' (\\[company-search-kill-others]) uses
- the search string to limit the completion candidates."
+The command `company-search-kill-others' (\\[company-search-kill-others])
+uses the search string to limit the completion candidates."
   (interactive)
   (company-search-mode 1)
   (company-enable-overriding-keymap company-search-map))
@@ -1326,10 +1333,20 @@ and invoke the normal binding."
            (and (< evt-row row)
                 (>= evt-row (+ row height)))))))
 
+(defun company--event-col-row (event)
+  (let* ((col-row (posn-actual-col-row (event-start event)))
+         (col (car col-row))
+         (row (cdr col-row)))
+    (incf col (window-hscroll))
+    (and header-line-format
+         (version< "24" emacs-version)
+         (decf row))
+    (cons col row)))
+
 (defun company-select-mouse (event)
   "Select the candidate picked by the mouse."
   (interactive "e")
-  (let ((event-col-row (posn-actual-col-row (event-start event)))
+  (let ((event-col-row (company--event-col-row event))
         (ovl-row (company--row))
         (ovl-height (and company-pseudo-tooltip-overlay
                          (min (overlay-get company-pseudo-tooltip-overlay
@@ -1377,8 +1394,9 @@ and invoke the normal binding."
 
 (defun company-complete ()
   "Complete the common part of all candidates or the current selection.
-The first time this is called, the common part is completed, the second time, or
-when the selection has been changed, the selected candidate is completed."
+The first time this is called, the common part is completed, the second
+time, or when the selection has been changed, the selected candidate is
+completed."
   (interactive)
   (when (company-manual-begin)
     (if (or company-selection-changed
@@ -1407,12 +1425,12 @@ To show the number next to the candidates in some back-ends, enable
       (push (make-string (- company-space-strings-limit 1 i) ?\  ) lst))
     (apply 'vector lst)))
 
-(defsubst company-space-string (len)
+(defun company-space-string (len)
   (if (< len company-space-strings-limit)
       (aref company-space-strings len)
     (make-string len ?\ )))
 
-(defsubst company-safe-substring (str from &optional to)
+(defun company-safe-substring (str from &optional to)
   (if (> from (string-width str))
       ""
     (with-temp-buffer
@@ -1440,9 +1458,12 @@ To show the number next to the candidates in some back-ends, enable
             (cons selected (company-call-backend 'meta selected))))
     (cdr company-last-metadata)))
 
-(defun company-doc-buffer (&optional _string)
-  (with-current-buffer (get-buffer-create "*Company meta-data*")
+(defun company-doc-buffer (&optional string)
+  (with-current-buffer (get-buffer-create "*company-documentation*")
     (erase-buffer)
+    (when string
+      (save-excursion
+        (insert string)))
     (current-buffer)))
 
 (defvar company--electric-commands
@@ -1471,7 +1492,7 @@ To show the number next to the candidates in some back-ends, enable
     (setq unread-command-events (list last-input-event))))
 
 (defun company-show-doc-buffer ()
-  "Temporarily show a buffer with the complete documentation for the selection."
+  "Temporarily show the documentation buffer for the selection."
   (interactive)
   (company--electric-do
     (let* ((selected (nth company-selection company-candidates))
@@ -1537,14 +1558,14 @@ To show the number next to the candidates in some back-ends, enable
 (defun company-begin-with (candidates
                            &optional prefix-length require-match callback)
   "Start a completion at point.
-CANDIDATES is the list of candidates to use and PREFIX-LENGTH is the length of
-the prefix that already is in the buffer before point.  It defaults to 0.
+CANDIDATES is the list of candidates to use and PREFIX-LENGTH is the length
+of the prefix that already is in the buffer before point.
+It defaults to 0.
 
-CALLBACK is a function called with the selected result if the user successfully
-completes the input.
+CALLBACK is a function called with the selected result if the user
+successfully completes the input.
 
-Example:
-\(company-begin-with '\(\"foo\" \"foobar\" \"foobarbaz\"\)\)"
+Example: \(company-begin-with '\(\"foo\" \"foobar\" \"foobarbaz\"\)\)"
   ;; FIXME: When Emacs 23 is no longer a concern, replace
   ;; `company-begin-with-marker' with a lexical variable; use a lexical closure.
   (setq company-begin-with-marker (copy-marker (point) t))
@@ -1638,16 +1659,27 @@ Example:
 (defun company-buffer-lines (beg end)
   (goto-char beg)
   (let (lines)
-    (while (< (point) end)
-      (let ((bol (point)))
+    (while (and (= 1 (vertical-motion 1))
+                (<= (point) end))
+      (let ((bound (min end (1- (point)))))
         ;; A visual line can contain several physical lines (e.g. with outline's
         ;; folding overlay).  Take only the first one.
-        (re-search-forward "$")
-        (push (buffer-substring bol (min end (point))) lines))
-      (vertical-motion 1))
+        (push (buffer-substring beg
+                                (save-excursion
+                                  (goto-char beg)
+                                  (re-search-forward "$" bound 'move)
+                                  (point)))
+              lines))
+      (setq beg (point)))
+    (unless (eq beg end)
+      (push (buffer-substring beg end) lines))
     (nreverse lines)))
 
-(defsubst company-modify-line (old new offset)
+(defun company-modify-line (old new offset)
+  (let ((prefix (get-text-property 0 'line-prefix old)))
+    (when prefix ; Keep the original value unmodified, for no special reason.
+      (setq old (concat prefix old))
+      (remove-text-properties 0 (length old) '(line-prefix) old)))
   (concat (company-safe-substring old 0 offset)
           new
           (company-safe-substring old (+ offset (length new)))))
@@ -1659,9 +1691,11 @@ Example:
 
 (defun company--replacement-string (lines old column nl &optional align-top)
 
-  (let ((width (length (car lines))))
-    (when (> width (- (window-width) column))
-      (setq column (max 0 (- (window-width) width)))))
+  (let ((width (length (car lines)))
+        (remaining-cols (- (+ (window-width) (window-hscroll))
+                           column)))
+    (when (> width remaining-cols)
+      (decf column (- width remaining-cols))))
 
   (let (new)
     (when align-top
@@ -1745,10 +1779,10 @@ Example:
 ;; show
 
 (defsubst company--window-inner-height ()
-  (let ((edges (window-inside-edges (selected-window))))
+  (let ((edges (window-inside-edges)))
     (- (nth 3 edges) (nth 1 edges))))
 
-(defsubst company--pseudo-tooltip-height ()
+(defun company--pseudo-tooltip-height ()
   "Calculate the appropriate tooltip height.
 Returns a negative number if the tooltip should be displayed above point."
   (let* ((lines (company--row))
@@ -1762,14 +1796,8 @@ Returns a negative number if the tooltip should be displayed above point."
   (company-pseudo-tooltip-hide)
   (save-excursion
 
-    (move-to-column 0)
-
     (let* ((height (company--pseudo-tooltip-height))
            above)
-
-      (when (and header-line-format
-                 (version< "24" emacs-version))
-        (decf row))
 
       (when (< height 0)
         (setq row (+ row height -1)
@@ -1797,10 +1825,9 @@ Returns a negative number if the tooltip should be displayed above point."
         (overlay-put ov 'company-height height)))))
 
 (defun company-pseudo-tooltip-show-at-point (pos)
-  (let ((col-row (company--col-row pos)))
-    (when col-row
-      (company-pseudo-tooltip-show (1+ (cdr col-row)) (car col-row)
-                                   company-selection))))
+  (let ((row (company--row pos))
+        (col (company--column pos)))
+    (company-pseudo-tooltip-show (1+ row) col company-selection)))
 
 (defun company-pseudo-tooltip-edit (selection)
   (let ((height (overlay-get company-pseudo-tooltip-overlay 'company-height)))
@@ -1825,6 +1852,8 @@ Returns a negative number if the tooltip should be displayed above point."
     (overlay-put company-pseudo-tooltip-overlay 'invisible t)
     ;; Beat outline's folding overlays, at least.
     (overlay-put company-pseudo-tooltip-overlay 'priority 1)
+    ;; No (extra) prefix for the first line.
+    (overlay-put company-pseudo-tooltip-overlay 'line-prefix "")
     (overlay-put company-pseudo-tooltip-overlay 'before-string
                  (overlay-get company-pseudo-tooltip-overlay 'company-before))
     (overlay-put company-pseudo-tooltip-overlay 'window (selected-window))))
@@ -1932,17 +1961,12 @@ Returns a negative number if the tooltip should be displayed above point."
         (message "%s" company-echo-last-msg)
       (message ""))))
 
-(defsubst company-echo-show-soon (&optional getter)
+(defun company-echo-show-soon (&optional getter)
   (when company-echo-timer
     (cancel-timer company-echo-timer))
   (setq company-echo-timer (run-with-timer 0 nil 'company-echo-show getter)))
 
 (defsubst company-echo-show-when-idle (&optional getter)
-  (when (sit-for .01)
-    (company-echo-show getter)))
-
-(defsubst company-echo-show-when-not-busy (&optional getter)
-  "Run `company-echo-show' with arg GETTER once Emacs isn't busy."
   (when (sit-for company-echo-delay)
     (company-echo-show getter)))
 
