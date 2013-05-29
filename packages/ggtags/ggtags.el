@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.6.3
+;; Version: 0.6.4
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -91,6 +91,11 @@ If nil, use Emacs default."
   :type '(choice (const :tag "No" nil)
                  (const :tag "Always" t)
                  integer)
+  :group 'ggtags)
+
+(defcustom ggtags-split-window-function split-window-preferred-function
+  "A function to control how ggtags pops up the auxiliary window."
+  :type 'function
   :group 'ggtags)
 
 (defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY TIMESTAMP)
@@ -235,8 +240,7 @@ When called with prefix, ask the name and kind of tag."
   (ggtags-check-root-directory)
   (ggtags-navigation-mode +1)
   (ring-insert find-tag-marker-ring (point-marker))
-  (let ((split-window-preferred-function
-         (lambda (w) (split-window (frame-root-window w))))
+  (let ((split-window-preferred-function ggtags-split-window-function)
         (default-directory (ggtags-root-directory)))
     (compilation-start
      (if (or verbose (not buffer-file-name))
@@ -248,7 +252,7 @@ When called with prefix, ask the name and kind of tag."
        (format "global %s --from-here=%d:%s \"%s\""
                ggtags-global-options
                (line-number-at-pos)
-               (expand-file-name buffer-file-name)
+               (expand-file-name (file-truename buffer-file-name))
                name))
      'ggtags-global-mode)))
 
@@ -256,8 +260,7 @@ When called with prefix, ask the name and kind of tag."
   (interactive)
   (ggtags-ensure-global-buffer
     (ggtags-navigation-mode +1)
-    (let ((split-window-preferred-function
-           (lambda (w) (split-window (frame-root-window w)))))
+    (let ((split-window-preferred-function ggtags-split-window-function))
       (compile-goto-error))))
 
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
@@ -364,7 +367,7 @@ When called with prefix, ask the name and kind of tag."
              (kill-compilation))
            (when (and (derived-mode-p 'ggtags-global-mode)
                       (get-buffer-window))
-             (delete-window (get-buffer-window)))
+             (quit-window nil (get-buffer-window)))
            (and time (run-with-idle-timer time nil 'kill-buffer buf))))))
 
 (defun ggtags-navigation-mode-done ()
