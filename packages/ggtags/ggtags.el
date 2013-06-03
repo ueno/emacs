@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.6.4
+;; Version: 0.6.5
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -52,7 +52,6 @@
 
 (eval-when-compile (require 'cl))
 (require 'compile)
-(require 'etags)                        ; for find-tag-marker-ring
 
 (if (not (fboundp 'comment-string-strip))
     (autoload 'comment-string-strip "newcomment"))
@@ -96,6 +95,15 @@ If nil, use Emacs default."
 (defcustom ggtags-split-window-function split-window-preferred-function
   "A function to control how ggtags pops up the auxiliary window."
   :type 'function
+  :group 'ggtags)
+
+(defcustom ggtags-global-output-format 'grep
+  "The output format for the 'global' command."
+  :type '(choice (const path)
+                 (const ctags)
+                 (const ctags-x)
+                 (const grep)
+                 (const cscope))
   :group 'ggtags)
 
 (defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY TIMESTAMP)
@@ -225,10 +233,10 @@ Return -1 if it does not exist."
              (format (if default "Tag (default %s): " "Tag: ") default)
              tags nil t nil nil default)))))
 
-(defvar ggtags-global-options
-  (concat "-v --result=grep"
-          (and ggtags-global-has-path-style " --path-style=shorter"))
-  "Options (as a string) for running `global'.")
+(defun ggtags-global-options ()
+  (concat "-v --result="
+          (symbol-name ggtags-global-output-format)
+          (and ggtags-global-has-path-style " --path-style=shorter")))
 
 ;;;###autoload
 (defun ggtags-find-tag (name &optional verbose)
@@ -237,6 +245,7 @@ If point is at a definition tag, find references, and vice versa.
 When called with prefix, ask the name and kind of tag."
   (interactive (list (ggtags-read-tag (not current-prefix-arg))
                      current-prefix-arg))
+  (eval-and-compile (require 'etags))
   (ggtags-check-root-directory)
   (ggtags-navigation-mode +1)
   (ring-insert find-tag-marker-ring (point-marker))
@@ -245,12 +254,12 @@ When called with prefix, ask the name and kind of tag."
     (compilation-start
      (if (or verbose (not buffer-file-name))
          (format "global %s %s \"%s\""
-                 ggtags-global-options
+                 (ggtags-global-options)
                  (if (y-or-n-p "Find definition (n for reference)? ")
                      "" "-r")
                  name)
        (format "global %s --from-here=%d:%s \"%s\""
-               ggtags-global-options
+               (ggtags-global-options)
                (line-number-at-pos)
                (expand-file-name (file-truename buffer-file-name))
                name))
@@ -266,13 +275,34 @@ When called with prefix, ask the name and kind of tag."
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (let ((count (save-excursion
                  (goto-char (point-max))
-                 (if (re-search-backward "^\\([0-9]+\\) objects? located" nil t)
+                 (if (re-search-backward "^\\([0-9]+\\) \\w+ located" nil t)
                      (string-to-number (match-string 1))
                    0))))
     (cons (if (> exit-status 0)
               msg
             (format "found %d %s" count (if (= count 1) "match" "matches")))
           exit-status)))
+
+;;; NOTE: Must not match the 'Global started at Mon Jun 3 10:24:13'
+;;; line or `compilation-auto-jump' will jump there and fail. See
+;;; comments before the 'gnu' entry in
+;;; `compilation-error-regexp-alist-alist'.
+(defvar ggtags-global-error-regexp-alist-alist
+  (append
+   '((path "^\\(?:[^/\n]*/\\)?[^ )\t\n]+$" 0)
+     ;; ACTIVE_ESCAPE	src/dialog.cc	172
+     (ctags "^\\([^ \t\n]+\\)[ \t]+\\(.*?\\)[ \t]+\\([0-9]+\\)$"
+            2 3 nil nil 2 (1 font-lock-function-name-face))
+     ;; ACTIVE_ESCAPE     172 src/dialog.cc    #undef ACTIVE_ESCAPE
+     (ctags-x "^\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\)[ \t]+\\(\\(?:[^/\n]*/\\)?[^ \t\n]+\\)"
+              3 2 nil nil 3 (1 font-lock-function-name-face))
+     ;; src/dialog.cc:172:#undef ACTIVE_ESCAPE
+     (grep "^\\(.+?\\):\\([0-9]+\\):\\(?:[^0-9\n]\\|[0-9][^0-9\n]\\|[0-9][0-9].\\)"
+           1 2 nil nil 1)
+     ;; src/dialog.cc ACTIVE_ESCAPE 172 #undef ACTIVE_ESCAPE
+     (cscope "^\\(.+?\\)[ \t]+\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\).*\\(?:[^0-9\n]\\|[^0-9\n][0-9]\\|[^:\n][0-9][0-9]\\)$"
+             1 3 nil nil 1 (2 font-lock-function-name-face)))
+   compilation-error-regexp-alist-alist))
 
 (defun ggtags-abbreviate-file (start end)
   (let ((inhibit-read-only t)
@@ -294,15 +324,18 @@ When called with prefix, ask the name and kind of tag."
 
 (defun ggtags-abbreviate-files (start end)
   (goto-char start)
-  (when ggtags-global-abbreviate-filename
-    (while (re-search-forward "^\\([^:\n]+\\):[0-9]+:" end t)
-      (when (and (or (not (numberp ggtags-global-abbreviate-filename))
-                     (> (length (match-string 1))
-                        ggtags-global-abbreviate-filename))
-                 ;; Ignore bogus file lines such as:
-                 ;;     Global found 2 matches at Thu Jan 31 13:45:19
-                 (get-text-property (match-beginning 0) 'compilation-message))
-        (ggtags-abbreviate-file (match-beginning 1) (match-end 1))))))
+  (let* ((error-re (cdr (assq ggtags-global-output-format
+                              ggtags-global-error-regexp-alist-alist)))
+         (sub (cadr error-re)))
+    (when (and ggtags-global-abbreviate-filename error-re)
+      (while (re-search-forward (car error-re) end t)
+        (when (and (or (not (numberp ggtags-global-abbreviate-filename))
+                       (> (length (match-string sub))
+                          ggtags-global-abbreviate-filename))
+                   ;; Ignore bogus file lines such as:
+                   ;;     Global found 2 matches at Thu Jan 31 13:45:19
+                   (get-text-property (match-beginning sub) 'compilation-message))
+          (ggtags-abbreviate-file (match-beginning sub) (match-end sub)))))))
 
 (defun ggtags-handle-single-match (buf _how)
   (unless (or (not ggtags-auto-jump-to-first-match)
@@ -319,8 +352,20 @@ When called with prefix, ask the name and kind of tag."
     (sit-for 0)                    ; See: http://debbugs.gnu.org/13829
     (ggtags-navigation-mode-cleanup buf 0.5)))
 
+(defvar ggtags-global-mode-font-lock-keywords
+  '(("^-[*]-.*-[*]-$"
+     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
+    ("^\\w+ not found.*\\|^[0-9]+ \\w+ located.*"
+     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
+    ("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
+     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t)
+     (1 compilation-error-face)
+     (2 compilation-error-face nil t))))
+
 (define-compilation-mode ggtags-global-mode "Global"
   "A mode for showing outputs from gnu global."
+  (setq-local compilation-error-regexp-alist
+              (list ggtags-global-output-format))
   (setq-local compilation-auto-jump-to-first-error
               ggtags-auto-jump-to-first-match)
   (setq-local compilation-scroll-output 'first-error)
@@ -436,10 +481,29 @@ When called with prefix, ask the name and kind of tag."
 
 (defvar ggtags-tag-overlay nil)
 (defvar ggtags-highlight-tag-timer nil)
-(make-variable-buffer-local 'ggtags-tag-overlay)
 
-(defun ggtags-highlight-tag-at-point (buffer)
-  (when (eq buffer (current-buffer))
+(defvar ggtags-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "\M-." 'ggtags-find-tag)
+    (define-key map "\M-," 'ggtags-find-tag-resume)
+    (define-key map "\C-c\M-k" 'ggtags-kill-file-buffers)
+    map))
+
+;;;###autoload
+(define-minor-mode ggtags-mode nil
+  :lighter (:eval (if ggtags-navigation-mode "" " GG"))
+  (if ggtags-mode
+      (progn
+        (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
+        (or (executable-find "global")
+            (message "Failed to find GNU Global")))
+    (remove-hook 'after-save-hook 'ggtags-after-save-function t)
+    (and (overlayp ggtags-tag-overlay)
+         (delete-overlay ggtags-tag-overlay))
+    (setq ggtags-tag-overlay nil)))
+
+(defun ggtags-highlight-tag-at-point ()
+  (when ggtags-mode
     (unless (overlayp ggtags-tag-overlay)
       (setq ggtags-tag-overlay (make-overlay (point) (point)))
       (overlay-put ggtags-tag-overlay 'ggtags t))
@@ -457,39 +521,10 @@ When called with prefix, ask the name and kind of tag."
       (cond
        ((not bounds)
         (overlay-put ggtags-tag-overlay 'face nil)
-        (move-overlay ggtags-tag-overlay (point) (point)))
+        (move-overlay ggtags-tag-overlay (point) (point) (current-buffer)))
        ((not (funcall done-p))
-        (move-overlay o (car bounds) (cdr bounds))
+        (move-overlay o (car bounds) (cdr bounds) (current-buffer))
         (overlay-put o 'face (and valid-tag 'ggtags-highlight)))))))
-
-(defun ggtags-post-command-function ()
-  (when (timerp ggtags-highlight-tag-timer)
-    (cancel-timer ggtags-highlight-tag-timer))
-  (setq ggtags-highlight-tag-timer
-        (run-with-idle-timer 0.2 nil 'ggtags-highlight-tag-at-point
-                             (current-buffer))))
-
-(defvar ggtags-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "\M-." 'ggtags-find-tag)
-    (define-key map "\M-," 'ggtags-find-tag-resume)
-    (define-key map "\C-c\M-k" 'ggtags-kill-file-buffers)
-    map))
-
-;;;###autoload
-(define-minor-mode ggtags-mode nil
-  :lighter (:eval (if ggtags-navigation-mode "" " GG"))
-  (if ggtags-mode
-      (progn
-        (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
-        (if (executable-find "global")
-            (add-hook 'post-command-hook 'ggtags-post-command-function nil t)
-          (message "Failed to find GNU Global")))
-    (remove-hook 'after-save-hook 'ggtags-after-save-function t)
-    (remove-hook 'post-command-hook 'ggtags-post-command-function t)
-    (and (overlayp ggtags-tag-overlay)
-         (delete-overlay ggtags-tag-overlay))
-    (setq ggtags-tag-overlay nil)))
 
 ;;; imenu
 
@@ -541,6 +576,12 @@ When called with prefix, ask the name and kind of tag."
       t)))
 
 ;;; Finish up
+
+(when ggtags-highlight-tag-timer
+  (cancel-timer ggtags-highlight-tag-timer))
+
+(setq ggtags-highlight-tag-timer
+      (run-with-idle-timer 0.2 t 'ggtags-highlight-tag-at-point))
 
 ;; Higher priority for `ggtags-navigation-mode' to avoid being
 ;; hijacked by modes such as `view-mode'.
