@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.6.5
+;; Version: 0.6.6
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -67,6 +67,10 @@
       (list 'progn (list 'defvar var val docstring)
             (list 'make-variable-buffer-local (list 'quote var))))))
 
+(eval-and-compile
+  (unless (fboundp 'user-error)
+    (defalias 'user-error 'error)))
+
 (defgroup ggtags nil
   "GNU Global source code tagging system."
   :group 'tools)
@@ -104,6 +108,11 @@ If nil, use Emacs default."
                  (const ctags-x)
                  (const grep)
                  (const cscope))
+  :group 'ggtags)
+
+(defcustom ggtags-completing-read-function completing-read-function
+  "Ggtags specific `completing-read-function' (which see)."
+  :type 'function
   :group 'ggtags)
 
 (defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY TIMESTAMP)
@@ -185,27 +194,26 @@ Return -1 if it does not exist."
 
 (defun ggtags-ensure-root-directory ()
   (or (ggtags-root-directory)
-      (if (yes-or-no-p "File GTAGS not found; run gtags? ")
-          (let ((root (read-directory-name "Directory: " nil nil t)))
-            (and (= (length root) 0) (error "No directory chosen"))
-            (with-temp-buffer
-              (if (zerop (let ((default-directory
-                                 (file-name-as-directory root)))
-                           (call-process "gtags" nil t)))
-                  (message "File GTAGS generated in `%s'"
-                           (ggtags-root-directory))
-                (error "%s" (comment-string-strip (buffer-string) t t)))))
-        (error "Aborted"))))
+      (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
+                (error "Aborted"))
+        (let ((root (read-directory-name "Directory: " nil nil t)))
+          (and (= (length root) 0) (error "No directory chosen"))
+          (when (with-temp-buffer
+                  (let ((default-directory
+                          (file-name-as-directory root)))
+                    (or (zerop (call-process "gtags" nil t))
+                        (error "%s" (comment-string-strip
+                                     (buffer-string) t t)))))
+            (kill-local-variable 'ggtags-root-directory)
+            (message "File GTAGS generated in `%s'"
+                     (ggtags-root-directory)))))))
 
 (defun ggtags-tag-names-1 (root &optional prefix)
   (when root
     (if (ggtags-cache-stale-p root)
         (let* ((default-directory (file-name-as-directory root))
                (tags (with-demoted-errors
-                       (split-string
-                        (with-output-to-string
-                          (call-process "global" nil (list standard-output nil)
-                                        nil "-c" (or prefix "")))))))
+                       (process-lines "global" "-c" (or prefix "")))))
           (and tags (ggtags-cache-set root tags))
           tags)
       (cadr (ggtags-cache-get root)))))
@@ -224,14 +232,13 @@ Return -1 if it does not exist."
 
 (defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
-  (let* ((tags (ggtags-tag-names))
-         (sym (thing-at-point 'symbol))
-         (default (and (member sym tags) sym)))
+  (let ((default (thing-at-point 'symbol))
+        (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
-          (if quick (or default (error "No valid tag at point"))
+          (if quick (or default (user-error "No tag at point"))
             (completing-read
              (format (if default "Tag (default %s): " "Tag: ") default)
-             tags nil t nil nil default)))))
+             (ggtags-tag-names) nil t nil nil default)))))
 
 (defun ggtags-global-options ()
   (concat "-v --result="
@@ -245,25 +252,32 @@ If point is at a definition tag, find references, and vice versa.
 When called with prefix, ask the name and kind of tag."
   (interactive (list (ggtags-read-tag (not current-prefix-arg))
                      current-prefix-arg))
-  (eval-and-compile (require 'etags))
   (ggtags-check-root-directory)
-  (ggtags-navigation-mode +1)
-  (ring-insert find-tag-marker-ring (point-marker))
   (let ((split-window-preferred-function ggtags-split-window-function)
-        (default-directory (ggtags-root-directory)))
+        (default-directory (ggtags-root-directory))
+        (help-char ??)
+        (help-form "\
+d: definitions          (-d)
+r: references           (-r)
+s: symbols              (-s)
+?: show this help\n"))
     (compilation-start
      (if (or verbose (not buffer-file-name))
-         (format "global %s %s \"%s\""
+         (format "global %s -%s \"%s\""
                  (ggtags-global-options)
-                 (if (y-or-n-p "Find definition (n for reference)? ")
-                     "" "-r")
+                 (char-to-string
+                  (read-char-choice "Tag type? (d/r/s/?) " '(?d ?r ?s)))
                  name)
-       (format "global %s --from-here=%d:'%s' \"%s\""
+       (format "global %s --from-here=%d:%s \"%s\""
                (ggtags-global-options)
                (line-number-at-pos)
-               (expand-file-name (file-truename buffer-file-name))
+               (shell-quote-argument
+                (expand-file-name (file-truename buffer-file-name)))
                name))
-     'ggtags-global-mode)))
+     'ggtags-global-mode))
+  (eval-and-compile (require 'etags))
+  (ring-insert find-tag-marker-ring (point-marker))
+  (ggtags-navigation-mode +1))
 
 (defun ggtags-find-tag-resume ()
   (interactive)
@@ -271,6 +285,84 @@ When called with prefix, ask the name and kind of tag."
     (ggtags-navigation-mode +1)
     (let ((split-window-preferred-function ggtags-split-window-function))
       (compile-goto-error))))
+
+;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
+(defun ggtags-list-tags (regexp file-or-directory)
+  "List all tags matching REGEXP in FILE-OR-DIRECTORY."
+  (interactive (list (read-string "POSIX regexp: ")
+                     (read-file-name "Directory: "
+                                     (if current-prefix-arg
+                                         (ggtags-root-directory)
+                                       default-directory)
+                                     buffer-file-name t)))
+  (let ((split-window-preferred-function ggtags-split-window-function)
+        (default-directory (if (file-directory-p file-or-directory)
+                               (file-name-as-directory file-or-directory)
+                             (file-name-directory file-or-directory))))
+    (ggtags-check-root-directory)
+    (eval-and-compile (require 'etags))
+    (ggtags-navigation-mode +1)
+    (ring-insert find-tag-marker-ring (point-marker))
+    (with-current-buffer
+        (compilation-start (format "global %s -e %s %s"
+                                   (ggtags-global-options)
+                                   regexp
+                                   (if (file-directory-p file-or-directory)
+                                       "-l ."
+                                     (concat "-f " (shell-quote-argument
+                                                    (file-name-nondirectory
+                                                     file-or-directory)))))
+                           'ggtags-global-mode)
+      (setq-local compilation-auto-jump-to-first-error nil)
+      (remove-hook 'compilation-finish-functions 'ggtags-handle-single-match t))))
+
+(defun ggtags-query-replace (from to &optional delimited directory)
+  "Query replace FROM with TO on all files in DIRECTORY."
+  (interactive
+   (append (query-replace-read-args "Query replace (regexp)" t t)
+           (list (read-directory-name "In directory: " nil nil t))))
+  (let ((default-directory (file-name-as-directory directory)))
+    (ggtags-check-root-directory)
+    (dolist (file (process-lines "global" "-P" "-l" "."))
+      (let ((file (expand-file-name file directory)))
+        (when (file-exists-p file)
+          (let* ((message-log-max nil)
+                 (visited (get-file-buffer file))
+                 (buffer (or visited
+                             (with-demoted-errors
+                               (find-file-noselect file)))))
+            (when buffer
+              (set-buffer buffer)
+              (if (save-excursion
+                    (goto-char (point))
+                    (re-search-forward from nil t))
+                  (progn
+                    (switch-to-buffer (current-buffer))
+                    (perform-replace from to t t delimited
+                                     nil multi-query-replace-map))
+                (message "Nothing to do for `%s'" file)
+                (or visited (kill-buffer))))))))))
+
+(defun ggtags-delete-tag-files ()
+  "Delete the tag files generated by gtags."
+  (interactive)
+  (when (ggtags-root-directory)
+    (let ((files (directory-files (ggtags-root-directory) t
+                                  (regexp-opt '("GPATH" "GRTAGS" "GTAGS" "ID"))))
+          (buffer "*GTags File List*"))
+      (or files (user-error "No tag files found"))
+      (with-output-to-temp-buffer buffer
+        (dolist (file files)
+          (princ file)
+          (princ "\n")))
+      (let ((win (get-buffer-window buffer)))
+        (unwind-protect
+            (progn
+              (fit-window-to-buffer win)
+              (when (yes-or-no-p "Remove GNU Global tag files? ")
+                (mapc 'delete-file files)))
+          (when (window-live-p win)
+            (quit-window t win)))))))
 
 (defvar-local ggtags-global-exit-status nil)
 
