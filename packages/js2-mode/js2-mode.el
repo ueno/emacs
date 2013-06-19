@@ -7,7 +7,7 @@
 ;;         Dmitry Gutov <dgutov@yandex.ru>
 ;; URL:  https://github.com/mooz/js2-mode/
 ;;       http://code.google.com/p/js2-mode/
-;; Version: 20130608
+;; Version: 20130619
 ;; Keywords: languages, javascript
 ;; Package-Requires: ((emacs "24.1"))
 
@@ -10562,8 +10562,9 @@ This ensures that the counts and `next-error' are correct."
 (defun js2-echo-error (old-point new-point)
   "Called by point-motion hooks."
   (let ((msg (get-text-property new-point 'help-echo)))
-    (when (and (stringp msg) (or (not (current-message))
-                                 (string= (current-message) "Quit")))
+    (when (and (stringp msg)
+               (not (active-minibuffer-window))
+               (not (current-message)))
       (message msg))))
 
 (defalias #'js2-echo-help #'js2-echo-error)
@@ -11138,6 +11139,8 @@ RESET means start over from the beginning."
           (if (zerop (decf count))
               (setq continue nil)))
         (setq errs (cdr errs)))
+      ;; Clear for `js2-echo-error'.
+      (message nil)
       (if err
           (goto-char (second err))
         ;; Wrap around to first error.
