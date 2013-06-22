@@ -2,8 +2,8 @@
 
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
-;; Author: Ivan Kanis <banana@kanis.fr>
-;; Version: 2.0
+;; Author: Ivan Kanis <ivan@kanis.fr>
+;; Version: 3.0
 
 ;; This file is part of GNU Emacs.
 
@@ -97,9 +97,13 @@
 ;; version 1
 
 ;; version 2
+;;  - don't force vim key bindings
 ;;  - remove debugging message
 ;;  - insert a jump moves the index back to top of list
 ;;  - insert jumps goes back to top of list
+
+;; version 3
+;;  - remove deleted files
 
 ;;; Code:
 
@@ -131,6 +135,7 @@
 (defun jumpc-write-list ()
   "Write jump list to file."
   (let (bgn end)
+    (jumpc-remove-deleted-file)
     (find-file jumpc-file)
     (goto-char (point-min))
     (setq bgn (re-search-forward "# Jumplist (newest first):" nil t))
@@ -161,6 +166,7 @@
 ;; TODO make it interactive with COUNT as argument
 (defun jumpc-jump (count)
   "Jump COUNT from current index."
+  (jumpc-remove-deleted-file)
   (let ((length (length jumpc-list)) file-name)
     ;; first backward motion adds current point in the list
     (when (and (> count 0) (= jumpc-index 0))
@@ -174,15 +180,10 @@
       (setq jumpc-index length))
      (t
       (setq file-name (nth 2 (nth jumpc-index jumpc-list)))
-      (if (file-exists-p file-name)
-          (progn
-            (find-file file-name)
-            (goto-char (point-min))
-            (forward-line (1- (nth 0 (nth jumpc-index jumpc-list))))
-            (move-to-column (nth 0 (nth jumpc-index jumpc-list))))
-        ;; TODO I guess the right thing(tm) would be to remove the
-        ;; entry from the list
-        (message "File %s disappeared!" file-name))))))
+      (find-file file-name)
+      (goto-char (point-min))
+      (forward-line (1- (nth 0 (nth jumpc-index jumpc-list))))
+      (move-to-column (nth 0 (nth jumpc-index jumpc-list)))))))
 
 (defun jumpc-insert ()
   "Insert jump location."
@@ -193,6 +194,19 @@
       (setq jumpc-list
             (cons (list (line-number-at-pos) (current-column) buffer-file-name)
                   jumpc-list)))))
+
+(defun jumpc-remove-deleted-file ()
+  "Remove deleted file in the list.
+Returns list minus deleted files."
+  (let ((length (length jumpc-list))
+        (index 0)
+        reduced-list element)
+    (while (< index length)
+      (setq element (nth index jumpc-list))
+      (when (file-exists-p (nth 2 element))
+        (setq reduced-list (cons element reduced-list)))
+      (setq index (1+ index)))
+    (setq jumpc-list reduced-list)))
 
 (defun jumpc-bind-vim-key ()
   "Bind keys just like vim."
