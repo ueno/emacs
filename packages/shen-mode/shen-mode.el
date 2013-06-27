@@ -1,6 +1,6 @@
 ;;; shen-mode.el --- A major mode for editing shen source code
 
-;; Copyright (C) 2011 Free Software Foundation, Inc.
+;; Copyright (C) 2011, 2013 Free Software Foundation, Inc.
 
 ;; Author: Eric Schulte <schulte.eric@gmail.com>
 ;; Version: 0.1
@@ -44,6 +44,7 @@
     map)
   "Currently just inherits from `lisp-mode-shared-map'.")
 
+(eval-and-compile
 (defconst shen-functions
   '((* "number --> number --> number" "Number multiplication.")
     (+ "number --> number --> number" "Number addition.")
@@ -220,7 +221,7 @@
     (warn "string --> string" "Prints the string as a warning and returns \"done\".  See strong-warning")
     (write-to-file "string --> A --> string" "Writes the second input into a file named in the first input. If the file does not exist, it is created, else it is overwritten. If the second input is a string then it is written to the file without the enclosing quotes.  The first input is returned.")
     (y-or-n\? "string --> boolean" "Prints the string as a question and returns true for y and false for n."))
-  "Shen functions taken largely from the Qi documentation by Dr. Mark Tarver.")
+  "Shen functions taken largely from the Qi documentation by Dr. Mark Tarver."))
 
 
 ;;; Fontification

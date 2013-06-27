@@ -1,6 +1,6 @@
 ;;; company-pysmell.el --- company-mode completion back-end for pysmell.el
 
-;; Copyright (C) 2009-2011  Free Software Foundation, Inc.
+;; Copyright (C) 2009-2011, 2013  Free Software Foundation, Inc.
 
 ;; Author: Nikolaj Schumacher
 
@@ -28,7 +28,7 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl))
-(require 'pysmell)
+(if t (require 'pysmell))               ;Don't load during compilation.
 
 (defvar company-pysmell--available-p 'unknown)
 (make-variable-buffer-local 'company-pysmell--available-p)

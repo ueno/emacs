@@ -1,6 +1,6 @@
 ;;; smart-operator.el --- Insert operators with surrounding spaces smartly
 
-;; Copyright (C) 2004, 2005, 2007-2012 Free Software Foundation, Inc.
+;; Copyright (C) 2004, 2005, 2007-2013 Free Software Foundation, Inc.
 
 ;; Author: William Xu <william.xwl@gmail.com>
 ;; Version: 4.0
@@ -106,11 +106,11 @@ e.g., `=' becomes ` = ', `+=' becomes ` += '.
 When `only-where' is 'after, we will insert space at back only;
 when `only-where' is 'before, we will insert space at front only;
 when `only-where' is 'middle, we will not insert space."
-  (case only-where
-    ((before) (insert " " op))
-    ((middle) (insert op))
-    ((after) (insert op " "))
-    (t
+  (pcase only-where
+    (`before (insert " " op))
+    (`middle (insert op))
+    (`after (insert op " "))
+    (_
      (let ((begin? (bolp)))
        (unless (or (looking-back (regexp-opt smart-operator-list)
                                  (line-beginning-position))
