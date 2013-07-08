@@ -5,7 +5,7 @@
 ;; Author:      Ulf Jasper <ulf.jasper@web.de>
 ;; Created:     22. Sep. 2011
 ;; Keywords:    demo, svg, clock
-;; Version:     0.4
+;; Version:     0.5
 
 ;; This file is part of GNU Emacs.
 
@@ -40,7 +40,7 @@
 ;; ======================================================================
 
 ;;; Code:
-(defconst svg-clock-version "0.4" "Version number of `svg-clock'.")
+(defconst svg-clock-version "0.5" "Version number of `svg-clock'.")
 
 (require 'image-mode)
 
@@ -186,7 +186,7 @@ TIME must have the form (SECOND MINUTE HOUR ...), as returned by `decode-time'."
       (svg-clock-replace "%SIZE%" (format "%d" svg-clock--actual-size))
       (svg-clock-replace "%SCALE%"
                          (format "%f" (/ svg-clock--actual-size 100.0)))
-
+      (image-mode)
       (image-toggle-display-image))))
 
 (defun svg-clock-update ()
