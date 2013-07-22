@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2006, 2012, 2013  Free Software Foundation, Inc.
 
-;; Version: 0.4
+;; Version: 0.5
 ;; Keywords: large files, utilities
 ;; Authors: 2006 Mathias Dahl <mathias.dahl@gmail.com>
 ;;          2012 Sam Steingold <sds@gnu.org>
@@ -27,10 +27,8 @@
 
 ;; This package provides the M-x vlf command, which visits part of a
 ;; large file in a read-only buffer without visiting the entire file.
-;; The buffer uses VLF mode, which defines the commands M-<next>
-;; (vlf-next-batch) and M-<prior> (vlf-prev-batch) to visit other
-;; parts of the file.  The option `vlf-batch-size' specifies the size
-;; of each batch, in bytes.
+;; The buffer uses VLF mode, which defines several commands for
+;; moving around, searching and editing selected chunk of file.
 
 ;; This package was inspired by a snippet posted by Kevin Rodgers,
 ;; showing how to use `insert-file-contents' to extract part of a
@@ -48,28 +46,31 @@
   :type 'integer
   :group 'vlf)
 
-;; Keep track of file position.
-(defvar vlf-start-pos)
-(defvar vlf-end-pos)
-(defvar vlf-file-size)
+;;; Keep track of file position.
+(defvar vlf-start-pos 0
+  "Absolute position of the visible chunk start.")
+(defvar vlf-end-pos vlf-batch-size
+  "Absolute position of the visible chunk end.")
+(defvar vlf-file-size 0 "Total size of presented file.")
 
 (defvar vlf-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [M-next] 'vlf-next-batch)
     (define-key map [M-prior] 'vlf-prev-batch)
-    (define-key map (kbd "M-+") 'vlf-change-batch-size)
-    (define-key map (kbd "M--")
+    (define-key map "+" 'vlf-change-batch-size)
+    (define-key map "-"
       (lambda () "Decrease vlf batch size by factor of 2."
         (interactive)
         (vlf-change-batch-size t)))
     (define-key map "s" 'vlf-re-search-forward)
     (define-key map "r" 'vlf-re-search-backward)
-    (define-key map ">" (lambda () "Jump to end of file content."
+    (define-key map "]" (lambda () "Jump to end of file content."
                           (interactive)
                           (vlf-insert-file buffer-file-name t)))
-    (define-key map "<" (lambda () "Jump to beginning of file content."
+    (define-key map "[" (lambda () "Jump to beginning of file content."
                           (interactive)
                           (vlf-insert-file buffer-file-name)))
+    (define-key map "e" 'vlf-edit-mode)
     map)
   "Keymap for `vlf-mode'.")
 
@@ -77,9 +78,15 @@
   "Mode to browse large files in."
   (setq buffer-read-only t)
   (set-buffer-modified-p nil)
+  (buffer-disable-undo)
   (make-local-variable 'vlf-batch-size)
+  (put 'vlf-batch-size 'permanent-local t)
   (make-local-variable 'vlf-start-pos)
-  (make-local-variable 'vlf-file-size))
+  (put 'vlf-start-pos 'permanent-local t)
+  (make-local-variable 'vlf-end-pos)
+  (put 'vlf-end-pos 'permanent-local t)
+  (make-local-variable 'vlf-file-size)
+  (put 'vlf-file-size 'permanent-local t))
 
 (defun vlf-change-batch-size (decrease)
   "Change the buffer-local value of `vlf-batch-size'.
@@ -88,11 +95,10 @@ with the prefix argument DECREASE it is halved."
   (interactive "P")
   (or (assq 'vlf-batch-size (buffer-local-variables))
       (error "%s is not local in this buffer" 'vlf-batch-size))
-  (setq vlf-batch-size
-        (if decrease
-            (/ vlf-batch-size 2)
-          (* vlf-batch-size 2)))
-  (vlf-update-buffer-name))
+  (setq vlf-batch-size (if decrease
+                            (/ vlf-batch-size 2)
+                          (* vlf-batch-size 2)))
+  (vlf-move-to-batch vlf-start-pos))
 
 (defun vlf-format-buffer-name ()
   "Return format for vlf buffer name."
@@ -165,6 +171,23 @@ When prefix argument is negative
   (set-buffer-modified-p nil)
   (vlf-update-buffer-name))
 
+(defun vlf-move-to-batch (start)
+  "Move to batch determined by START.
+Adjust according to file start/end and show `vlf-batch-size' bytes."
+  (setq vlf-start-pos (max 0 start)
+        vlf-end-pos (+ vlf-start-pos vlf-batch-size))
+  (if (< vlf-file-size vlf-end-pos)   ; re-check file size
+      (setq vlf-file-size
+            (nth 7 (file-attributes buffer-file-name))
+            vlf-end-pos (min vlf-end-pos vlf-file-size)
+            vlf-start-pos (max 0 (- vlf-end-pos vlf-batch-size))))
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (insert-file-contents buffer-file-name nil
+                          vlf-start-pos vlf-end-pos))
+  (set-buffer-modified-p nil)
+  (vlf-update-buffer-name))
+
 (defun vlf-move-to-chunk (start end)
   "Move to chunk determined by START END."
   (if (< vlf-file-size end)          ; re-check file size
@@ -197,7 +220,6 @@ buffer.  You can customize number of bytes displayed by customizing
 `vlf-batch-size'."
   (interactive "fFile to open: \nP")
   (with-current-buffer (generate-new-buffer "*vlf*")
-    (buffer-disable-undo)
     (setq buffer-file-name file
           vlf-file-size (nth 7 (file-attributes file)))
     (vlf-insert-file file from-end)
@@ -235,7 +257,7 @@ OP-TYPE specifies the file operation being performed over FILENAME."
                            '(?o ?O ?v ?V ?a ?A))))
          (cond ((memq char '(?o ?O)))
                ((memq char '(?v ?V))
-                (vlf nil filename)
+                (vlf filename nil)
                 (error ""))
                ((memq char '(?a ?A))
                 (error "Aborted"))))))
@@ -244,6 +266,94 @@ OP-TYPE specifies the file operation being performed over FILENAME."
 ;;;###autoload
 (fset 'abort-if-file-too-large 'vlf-if-file-too-large)
 
+;;; search
+(defun vlf-re-search (regexp count backward)
+  "Search for REGEXP COUNT number of times forward or BACKWARD."
+  (let* ((match-start-pos (+ vlf-start-pos (point)))
+         (match-end-pos match-start-pos)
+         (to-find count)
+         (search-reporter (make-progress-reporter
+                           (concat "Searching for " regexp)
+                           (if backward
+                               (- vlf-file-size vlf-end-pos)
+                             vlf-start-pos)
+                           vlf-file-size))
+         (batch-step (/ vlf-batch-size 8))) ; amount of chunk overlap
+    (unwind-protect
+        (catch 'end-of-file
+          (if backward
+              (while (not (zerop to-find))
+                (cond ((re-search-backward regexp nil t)
+                       (setq to-find (1- to-find)
+                             match-start-pos (+ vlf-start-pos
+                                                (match-beginning 0))
+                             match-end-pos (+ vlf-start-pos
+                                              (match-end 0))))
+                      ((zerop vlf-start-pos)
+                       (throw 'end-of-file nil))
+                      (t (let ((batch-move (- vlf-start-pos
+                                              (- vlf-batch-size
+                                                 batch-step))))
+                           (vlf-move-to-batch
+                            (if (< match-start-pos batch-move)
+                                (- match-start-pos vlf-batch-size)
+                              batch-move)))
+                         (goto-char (if (< match-start-pos
+                                           vlf-end-pos)
+                                        (- match-start-pos
+                                           vlf-start-pos)
+                                      (point-max)))
+                         (progress-reporter-update search-reporter
+                                                   vlf-start-pos))))
+            (while (not (zerop to-find))
+              (cond ((re-search-forward regexp nil t)
+                     (setq to-find (1- to-find)
+                           match-start-pos (+ vlf-start-pos
+                                              (match-beginning 0))
+                           match-end-pos (+ vlf-start-pos
+                                            (match-end 0))))
+                    ((= vlf-end-pos vlf-file-size)
+                     (throw 'end-of-file nil))
+                    (t (let ((batch-move (- vlf-end-pos batch-step)))
+                         (vlf-move-to-batch
+                          (if (< batch-move match-end-pos)
+                              match-end-pos
+                            batch-move)))
+                       (goto-char (if (< vlf-start-pos match-end-pos)
+                                      (- match-end-pos vlf-start-pos)
+                                    (point-min)))
+                       (progress-reporter-update search-reporter
+                                                 vlf-end-pos)))))
+          (progress-reporter-done search-reporter))
+      (if backward
+          (vlf-goto-match match-end-pos match-start-pos
+                           count to-find)
+        (vlf-goto-match match-start-pos match-end-pos
+                         count to-find)))))
+
+(defun vlf-goto-match (match-pos-start match-pos-end count to-find)
+  "Move to chunk surrounding MATCH-POS-START and MATCH-POS-END.
+According to COUNT and left TO-FIND, show if search has been
+successful.  Return nil if nothing found."
+  (let ((success (zerop to-find)))
+    (or success
+        (vlf-move-to-batch (- match-pos-start
+                               (/ vlf-batch-size 2))))
+    (let* ((match-end (- match-pos-end vlf-start-pos))
+           (overlay (make-overlay (- match-pos-start vlf-start-pos)
+                                  match-end)))
+      (overlay-put overlay 'face 'region)
+      (or success (goto-char match-end))
+      (prog1 (cond (success t)
+                   ((< to-find count)
+                    (message "Moved to the %d match which is last"
+                             (- count to-find))
+                    t)
+                   (t (message "Not found")
+                      nil))
+        (sit-for 0.1)
+        (delete-overlay overlay)))))
+
 (defun vlf-re-search-forward (regexp count)
   "Search forward for REGEXP prefix COUNT number of times."
   (interactive (list (read-regexp "Search whole file"
@@ -251,124 +361,50 @@ OP-TYPE specifies the file operation being performed over FILENAME."
                                       (car regexp-history))
                                   'regexp-history)
                      (or current-prefix-arg 1)))
-  (let ((match-chunk-start vlf-start-pos)
-        (match-chunk-end vlf-end-pos)
-        (match-start-pos (point))
-        (match-end-pos (point))
-        (to-find count)
-        (search-reporter (make-progress-reporter
-                          (concat "Searching for " regexp)
-                          vlf-start-pos vlf-file-size))
-        (initial-chunk t))
-    (unwind-protect
-        (catch 'end-of-file
-          (while (not (zerop to-find))
-            (cond ((re-search-forward regexp nil t)
-                   (setq to-find (if (= match-start-pos
-                                        (match-beginning 0))
-                                     to-find
-                                   (1- to-find))
-                         match-start-pos (match-beginning 0)
-                         match-end-pos (match-end 0)
-                         match-chunk-start vlf-start-pos
-                         match-chunk-end vlf-end-pos)
-                   (if (and (< vlf-batch-size match-start-pos)
-                            (> (- vlf-end-pos vlf-start-pos)
-                               vlf-batch-size))
-                       (setq match-chunk-start
-                             (+ match-chunk-start vlf-batch-size)
-                             match-start-pos (- match-start-pos
-                                                vlf-batch-size)
-                             match-end-pos (- match-end-pos
-                                              vlf-batch-size))))
-                  ((= vlf-end-pos vlf-file-size)
-                   (throw 'end-of-file nil))
-                  (t (if initial-chunk
-                         (progn (setq initial-chunk nil)
-                                (vlf-next-batch -1))
-                       (vlf-move-to-chunk (+ vlf-start-pos
-                                              vlf-batch-size)
-                                           (+ vlf-end-pos
-                                              vlf-batch-size)))
-                     (goto-char (if (< vlf-start-pos match-chunk-end)
-                                    match-start-pos
-                                  (point-min)))
-                     (goto-char match-start-pos)
-                     (progress-reporter-update search-reporter
-                                               vlf-end-pos))))
-          (progress-reporter-done search-reporter))
-      (vlf-end-search match-chunk-start match-chunk-end
-                       match-end-pos count to-find))))
+  (vlf-re-search regexp count nil))
 
 (defun vlf-re-search-backward (regexp count)
   "Search backward for REGEXP prefix COUNT number of times."
-  (interactive (list (read-regexp "Search whole file"
+  (interactive (list (read-regexp "Search whole file backward"
                                   (if regexp-history
                                       (car regexp-history))
                                   'regexp-history)
                      (or current-prefix-arg 1)))
-  (let ((match-chunk-start vlf-start-pos)
-        (match-chunk-end vlf-end-pos)
-        (match-start-pos (point))
-        (match-end-pos (point))
-        (to-find count)
-        (search-reporter (make-progress-reporter
-                          (concat "Searching for " regexp)
-                          (- vlf-file-size vlf-end-pos)
-                          vlf-file-size))
-        (initial-chunk t))
-    (unwind-protect
-        (catch 'start-of-file
-          (while (not (zerop to-find))
-            (cond ((re-search-backward regexp nil t)
-                   (setq to-find (if (= match-end-pos
-                                        (match-end 0))
-                                     to-find
-                                   (1- to-find))
-                         match-start-pos (match-beginning 0)
-                         match-end-pos (match-end 0)
-                         match-chunk-start vlf-start-pos
-                         match-chunk-end vlf-end-pos)
-                   (if (and (< match-end-pos vlf-batch-size)
-                            (> (- vlf-end-pos vlf-start-pos)
-                               vlf-batch-size))
-                       (setq match-chunk-end
-                             (- match-chunk-end
-                                vlf-batch-size))))
-                  ((zerop vlf-start-pos)
-                   (throw 'start-of-file nil))
-                  (t (if initial-chunk
-                         (progn (setq initial-chunk nil)
-                                (vlf-prev-batch -1))
-                       (vlf-move-to-chunk (- vlf-start-pos
-                                              vlf-batch-size)
-                                           (- vlf-end-pos
-                                              vlf-batch-size)))
-                     (goto-char (if (< match-chunk-start vlf-end-pos)
-                                    match-end-pos
-                                  (point-max)))
-                     (setq last-chunk-match nil)
-                     (progress-reporter-update search-reporter
-                                               (- vlf-file-size
-                                                  vlf-start-pos)))))
-          (progress-reporter-done search-reporter))
-      (vlf-end-search match-chunk-start match-chunk-end
-                       match-start-pos count to-find))))
+  (vlf-re-search regexp count t))
 
-(defun vlf-end-search (match-chunk-start match-chunk-end
-                                          match-pos count to-find)
-  "Move to chunk determined by MATCH-CHUNK-START and MATCH-CHUNK-END.
-Go to MATCH-POS and according to COUNT and left TO-FIND show if search
-has been successful.  Return nil if nothing found."
-  (vlf-move-to-chunk match-chunk-start match-chunk-end)
-  (goto-char match-pos)
-  (cond ((zerop to-find) t)
-        ((< to-find count)
-         (message "Moved to the %d match which is last found"
-                  (- count to-find))
-         t)
-        (t (message "Not found")
-           nil)))
+;;; editing
+(defvar vlf-edit-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map text-mode-map)
+    (define-key map "\C-c\C-c" 'vlf-write)
+    (define-key map "\C-c\C-q" 'vlf-discard-edit)
+    map)
+  "Keymap for command `vlf-edit-mode'.")
+
+(define-derived-mode vlf-edit-mode vlf-mode "VLF[edit]"
+  "Major mode for editing large file chunks."
+  (setq buffer-read-only nil)
+  (buffer-enable-undo)
+  (message (substitute-command-keys
+            "Editing: Type \\[vlf-write] to write chunk \
+or \\[vlf-discard-edit] to discard changes.")))
+
+(defun vlf-write ()
+  "Write current chunk to file.  May overwrite existing content."
+  (interactive)
+  (when (or (= (buffer-size) (- vlf-end-pos vlf-start-pos))
+            (y-or-n-p "Changed size of original chunk.  \
+End of chunk will be garbled.  Continue? "))
+    (write-region nil nil buffer-file-name vlf-start-pos)
+    (vlf-move-to-chunk vlf-start-pos vlf-end-pos)
+    (vlf-mode)))
+
+(defun vlf-discard-edit ()
+  "Discard edit and refresh chunk from file."
+  (interactive)
+  (vlf-move-to-chunk vlf-start-pos vlf-end-pos)
+  (vlf-mode)
+  (message "Switched to VLF mode."))
 
 (provide 'vlf)
 
