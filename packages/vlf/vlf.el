@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2006, 2012, 2013  Free Software Foundation, Inc.
 
-;; Version: 0.8
+;; Version: 0.9
 ;; Keywords: large files, utilities
 ;; Authors: 2006 Mathias Dahl <mathias.dahl@gmail.com>
 ;;          2012 Sam Steingold <sds@gnu.org>
@@ -26,9 +26,9 @@
 ;;; Commentary:
 
 ;; This package provides the M-x vlf command, which visits part of a
-;; large file in a read-only buffer without visiting the entire file.
+;; large file without loading the entire file.
 ;; The buffer uses VLF mode, which defines several commands for
-;; moving around, searching and editing selected chunk of file.
+;; moving around, searching and editing selected part of file.
 
 ;; This package was inspired by a snippet posted by Kevin Rodgers,
 ;; showing how to use `insert-file-contents' to extract part of a
@@ -49,8 +49,7 @@
 ;;; Keep track of file position.
 (defvar vlf-start-pos 0
   "Absolute position of the visible chunk start.")
-(defvar vlf-end-pos vlf-batch-size
-  "Absolute position of the visible chunk end.")
+(defvar vlf-end-pos 0 "Absolute position of the visible chunk end.")
 (defvar vlf-file-size 0 "Total size of presented file.")
 
 (defvar vlf-mode-map
@@ -78,7 +77,8 @@
   (setq buffer-read-only t)
   (set-buffer-modified-p nil)
   (buffer-disable-undo)
-  (add-hook 'write-contents-functions 'vlf-write)
+  (make-local-variable 'write-file-functions)
+  (add-hook 'write-file-functions 'vlf-write)
   (make-local-variable 'revert-buffer-function)
   (setq revert-buffer-function 'vlf-revert)
   (make-local-variable 'vlf-batch-size)
@@ -98,10 +98,10 @@ buffer.  You can customize number of bytes displayed by customizing
 `vlf-batch-size'."
   (interactive "fFile to open: ")
   (with-current-buffer (generate-new-buffer "*vlf*")
+    (vlf-mode)
     (setq buffer-file-name file
           vlf-file-size (vlf-get-file-size file))
     (vlf-insert-file)
-    (vlf-mode)
     (switch-to-buffer (current-buffer))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -168,11 +168,11 @@ OP-TYPE specifies the file operation being performed over FILENAME."
              (goto-char (point-max)))
     ad-do-it))
 
-;; non recent Emacs
+;; non-recent Emacs
 (unless (fboundp 'file-size-human-readable)
   (defun file-size-human-readable (file-size)
     "Print FILE-SIZE in MB."
-    (format "%.1fMB" (/ file-size 1024.0))))
+    (format "%.1fMB" (/ file-size 1048576.0))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; utilities
@@ -202,9 +202,9 @@ with the prefix argument DECREASE it is halved."
   "Update the current buffer name."
   (rename-buffer (vlf-format-buffer-name) t))
 
-(defmacro vlf-get-file-size (file)
+(defun vlf-get-file-size (file)
   "Get size in bytes of FILE."
-  `(nth 7 (file-attributes ,file)))
+  (nth 7 (file-attributes file)))
 
 (defun vlf-insert-file (&optional from-end)
   "Insert first chunk of current file contents in current buffer.
@@ -351,15 +351,17 @@ When given MINIMAL flag, skip non important operations."
 (defun vlf-adjust-chunk ()
   "Adjust chunk beginning until content can be properly decoded.
 Return number of bytes moved back for this to happen."
-  (let ((shift 0))
+  (let ((shift 0)
+        (chunk-size (- vlf-end-pos vlf-start-pos)))
     (while (and (not (zerop vlf-start-pos))
-                (< shift 3)
-                (/= (- vlf-end-pos vlf-start-pos)
+                (< shift 4)
+                (/= chunk-size
                     (length (encode-coding-region
                              (point-min) (point-max)
                              buffer-file-coding-system t))))
       (setq shift (1+ shift)
-            vlf-start-pos (1- vlf-start-pos))
+            vlf-start-pos (1- vlf-start-pos)
+            chunk-size (1+ chunk-size))
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert-file-contents buffer-file-name nil
@@ -370,8 +372,10 @@ Return number of bytes moved back for this to happen."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; search
 
-(defun vlf-re-search (regexp count backward)
-  "Search for REGEXP COUNT number of times forward or BACKWARD."
+(defun vlf-re-search (regexp count backward batch-step)
+  "Search for REGEXP COUNT number of times forward or BACKWARD.
+BATCH-STEP is amount of overlap between successive chunks."
+  (assert (< 0 count))
   (let* ((match-chunk-start vlf-start-pos)
          (match-chunk-end vlf-end-pos)
          (match-start-pos (+ vlf-start-pos (position-bytes (point))))
@@ -382,8 +386,7 @@ Return number of bytes moved back for this to happen."
                     (if backward
                         (- vlf-file-size vlf-end-pos)
                       vlf-start-pos)
-                    vlf-file-size))
-         (batch-step (/ vlf-batch-size 8))) ; amount of chunk overlap
+                    vlf-file-size)))
     (unwind-protect
         (catch 'end-of-file
           (if backward
@@ -439,7 +442,7 @@ Return number of bytes moved back for this to happen."
                                       (or (byte-to-position
                                            (- match-end-pos
                                               vlf-start-pos))
-                                          (point-max))
+                                          (point-min))
                                     (point-min)))
                        (progress-reporter-update reporter
                                                  vlf-end-pos)))))
@@ -494,7 +497,7 @@ Search is performed chunk by chunk in `vlf-batch-size' memory."
                                   (if regexp-history
                                       (car regexp-history)))
                      (or current-prefix-arg 1)))
-  (vlf-re-search regexp count nil))
+  (vlf-re-search regexp count nil (/ vlf-batch-size 8)))
 
 (defun vlf-re-search-backward (regexp count)
   "Search backward for REGEXP prefix COUNT number of times.
@@ -503,21 +506,26 @@ Search is performed chunk by chunk in `vlf-batch-size' memory."
                                   (if regexp-history
                                       (car regexp-history)))
                      (or current-prefix-arg 1)))
-  (vlf-re-search regexp count t))
+  (vlf-re-search regexp count t (/ vlf-batch-size 8)))
 
 (defun vlf-goto-line (n)
-  "Go to line N."
+  "Go to line N.  If N is negative, count from the end of file."
   (interactive "nGo to line: ")
   (let ((start-pos vlf-start-pos)
         (end-pos vlf-end-pos)
         (pos (point))
         (success nil))
     (unwind-protect
-        (progn (vlf-beginning-of-file)
-               (goto-char (point-min))
-               (setq success (vlf-re-search-forward "[\n\C-m]"
-                                                     (1- n))))
-      (unless success
+        (if (< 0 n)
+            (progn (vlf-beginning-of-file)
+                   (goto-char (point-min))
+                   (setq success (vlf-re-search "[\n\C-m]" (1- n)
+                                                 nil 0)))
+          (vlf-end-of-file)
+          (goto-char (point-max))
+          (setq success (vlf-re-search "[\n\C-m]" (- n) t 0)))
+      (if success
+          (message "Onto line %s" n)
         (vlf-move-to-chunk start-pos end-pos)
         (goto-char pos)))))
 
@@ -530,6 +538,7 @@ Search is performed chunk by chunk in `vlf-batch-size' memory."
     (define-key map "p" 'vlf-occur-prev-match)
     (define-key map "\C-m" 'vlf-occur-visit)
     (define-key map [mouse-1] 'vlf-occur-visit)
+    (define-key map "o" 'vlf-occur-show)
     map)
   "Keymap for command `vlf-occur-mode'.")
 
@@ -554,12 +563,27 @@ Search is performed chunk by chunk in `vlf-batch-size' memory."
     (goto-char (or (previous-single-property-change (point) 'face)
                    (point-max)))))
 
+(defun vlf-occur-show (&optional event)
+  "Visit current `vlf-occur' link in a vlf buffer but stay in the \
+occur buffer.  If original VLF buffer has been killed,
+open new VLF session each time.
+EVENT may hold details of the invocation."
+  (interactive (list last-nonmenu-event))
+  (let ((occur-buffer (if event
+                          (window-buffer (posn-window
+                                          (event-end event)))
+                        (current-buffer))))
+    (vlf-occur-visit event)
+    (pop-to-buffer occur-buffer)))
+
 (defun vlf-occur-visit (&optional event)
   "Visit current `vlf-occur' link in a vlf buffer.
-The same for mouse EVENT."
+If original VLF buffer has been killed,
+open new VLF session each time.
+EVENT may hold details of the invocation."
   (interactive (list last-nonmenu-event))
   (when event
-    (switch-to-buffer (window-buffer (posn-window (event-end event))))
+    (set-buffer (window-buffer (posn-window (event-end event))))
     (goto-char (posn-point (event-end event))))
   (let* ((pos (point))
          (pos-relative (- pos (line-beginning-position) 1))
@@ -568,20 +592,27 @@ The same for mouse EVENT."
         (let ((chunk-start (get-char-property pos 'chunk-start))
               (chunk-end (get-char-property pos 'chunk-end))
               (buffer (get-char-property pos 'buffer))
-              (match-pos (or (get-char-property pos 'match-pos)
-                             (+ (get-char-property pos 'line-pos)
-                                pos-relative))))
-          (unless (buffer-live-p buffer)
-            (let ((occur-buffer (current-buffer)))
-              (setq buffer (vlf file))
-              (switch-to-buffer occur-buffer)))
+              (match-pos (+ (get-char-property pos 'line-pos)
+                            pos-relative)))
+          (or (buffer-live-p buffer)
+              (let ((occur-buffer (current-buffer)))
+                (setq buffer (vlf file))
+                (switch-to-buffer occur-buffer)))
           (pop-to-buffer buffer)
-          (vlf-move-to-chunk chunk-start chunk-end)
-          (set-buffer buffer)
-          (goto-char match-pos)))))
+          (if (buffer-modified-p)
+              (cond ((and (= vlf-start-pos chunk-start)
+                          (= vlf-end-pos chunk-end))
+                     (goto-char match-pos))
+                    ((y-or-n-p "VLF buffer has been modified.  \
+Really jump to new chunk? ")
+                     (vlf-move-to-chunk chunk-start chunk-end)
+                     (goto-char match-pos)))
+            (vlf-move-to-chunk chunk-start chunk-end)
+            (goto-char match-pos))))))
 
 (defun vlf-occur (regexp)
-  "Make occur style index for REGEXP."
+  "Make whole file occur style index for REGEXP.
+Prematurely ending indexing will still show what's found so far."
   (interactive (list (read-regexp "List lines matching regexp"
                                   (if regexp-history
                                       (car regexp-history)))))
@@ -590,9 +621,9 @@ The same for mouse EVENT."
         (pos (point)))
     (vlf-beginning-of-file)
     (goto-char (point-min))
-    (vlf-build-occur regexp)
-    (vlf-move-to-chunk start-pos end-pos)
-    (goto-char pos)))
+    (unwind-protect (vlf-build-occur regexp)
+      (vlf-move-to-chunk start-pos end-pos)
+      (goto-char pos))))
 
 (defun vlf-build-occur (regexp)
   "Build occur style index for REGEXP."
@@ -609,19 +640,20 @@ The same for mouse EVENT."
         (line-regexp (concat "\\(?5:[\n\C-m]\\)\\|\\(?10:"
                              regexp "\\)"))
         (batch-step (/ vlf-batch-size 8))
+        (end-of-file nil)
         (reporter (make-progress-reporter
                    (concat "Building index for " regexp "...")
                    vlf-start-pos vlf-file-size)))
     (unwind-protect
         (progn
-          (while (/= vlf-end-pos vlf-file-size)
+          (while (not end-of-file)
             (if (re-search-forward line-regexp nil t)
                 (progn
                   (setq match-end-pos (+ vlf-start-pos
                                          (position-bytes
                                           (match-end 0))))
                   (if (match-string 5)
-                      (setq line (1+ line)
+                      (setq line (1+ line) ; line detected
                             last-line-pos (point))
                     (let* ((chunk-start vlf-start-pos)
                            (chunk-end vlf-end-pos)
@@ -630,8 +662,8 @@ The same for mouse EVENT."
                            (line-text (buffer-substring
                                        line-pos (line-end-position))))
                       (with-current-buffer occur-buffer
-                        (unless (= line last-match-line)
-                          (insert "\n:")
+                        (unless (= line last-match-line) ;new match line
+                          (insert "\n:") ; insert line number
                           (let* ((overlay-pos (1- (point)))
                                  (overlay (make-overlay
                                            overlay-pos
@@ -640,7 +672,7 @@ The same for mouse EVENT."
                                          (propertize
                                           (number-to-string line)
                                           'face 'shadow)))
-                          (insert (propertize line-text
+                          (insert (propertize line-text ; insert line
                                               'file file
                                               'buffer vlf-buffer
                                               'chunk-start chunk-start
@@ -652,29 +684,31 @@ The same for mouse EVENT."
                                                       line))))
                         (setq last-match-line line
                               total-matches (1+ total-matches))
-                        (let ((line-start (+ (line-beginning-position)
-                                             1))
+                        (let ((line-start (1+
+                                           (line-beginning-position)))
                               (match-pos (match-beginning 10)))
-                          (add-text-properties
+                          (add-text-properties ; mark match
                            (+ line-start match-pos (- last-line-pos))
                            (+ line-start (match-end 10)
                               (- last-line-pos))
-                           (list 'face 'match 'match-pos match-pos
+                           (list 'face 'match
                                  'help-echo
                                  (format "Move to match %d"
                                          total-matches))))))))
-              (let ((batch-move (- vlf-end-pos batch-step)))
-                (vlf-move-to-batch (if (< batch-move match-end-pos)
-                                        match-end-pos
-                                      batch-move) t))
-              (goto-char (if (< vlf-start-pos match-end-pos)
-                             (or (byte-to-position (- match-end-pos
-                                                      vlf-start-pos))
-                                 (point-min))
-                           (point-min)))
-              (setq last-match-line 0
-                    last-line-pos (point-min))
-              (progress-reporter-update reporter vlf-end-pos)))
+              (setq end-of-file (= vlf-end-pos vlf-file-size))
+              (unless end-of-file
+                (let ((batch-move (- vlf-end-pos batch-step)))
+                  (vlf-move-to-batch (if (< batch-move match-end-pos)
+                                          match-end-pos
+                                        batch-move) t))
+                (goto-char (if (< vlf-start-pos match-end-pos)
+                               (or (byte-to-position (- match-end-pos
+                                                        vlf-start-pos))
+                                   (point-min))
+                             (point-min)))
+                (setq last-match-line 0
+                      last-line-pos (line-beginning-position))
+                (progress-reporter-update reporter vlf-end-pos))))
           (progress-reporter-done reporter))
       (if (zerop total-matches)
           (progn (with-current-buffer occur-buffer
@@ -688,7 +722,7 @@ The same for mouse EVENT."
 in file: %s" total-matches line regexp file)
                    'face 'underline))
           (set-buffer-modified-p nil)
-          (forward-char)
+          (forward-char 2)
           (vlf-occur-mode))
         (display-buffer occur-buffer)))))
 
@@ -700,6 +734,7 @@ in file: %s" total-matches line regexp file)
     (set-keymap-parent map text-mode-map)
     (define-key map "\C-c\C-c" 'vlf-write)
     (define-key map "\C-c\C-q" 'vlf-discard-edit)
+    (define-key map "\C-v" vlf-mode-map)
     map)
   "Keymap for command `vlf-edit-mode'.")
 
@@ -714,6 +749,7 @@ or \\[vlf-discard-edit] to discard changes.")))
 (defun vlf-discard-edit ()
   "Discard edit and refresh chunk from file."
   (interactive)
+  (set-buffer-modified-p nil)
   (vlf-move-to-chunk vlf-start-pos vlf-end-pos)
   (vlf-mode)
   (message "Switched to VLF mode."))
@@ -741,8 +777,8 @@ Save anyway? ")))
             (t (vlf-file-shift-forward (- size-change))))
       (vlf-move-to-chunk vlf-start-pos vlf-end-pos)
       (goto-char pos))
-    (vlf-mode)
-    t))
+    (vlf-mode))
+  t)
 
 (defun vlf-file-shift-back (size-change)
   "Shift file contents SIZE-CHANGE bytes back."
