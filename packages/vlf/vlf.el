@@ -4,6 +4,7 @@
 
 ;; Version: 0.9
 ;; Keywords: large files, utilities
+;; Maintainer: Andrey Kotlarski <m00naticus@gmail.com>
 ;; Authors: 2006 Mathias Dahl <mathias.dahl@gmail.com>
 ;;          2012 Sam Steingold <sds@gnu.org>
 ;;          2013 Andrey Kotlarski <m00naticus@gmail.com>
@@ -120,7 +121,7 @@ buffer.  You can customize number of bytes displayed by customizing
 ;;;###autoload
 (defun vlf-if-file-too-large (size op-type &optional filename)
   "If file SIZE larger than `large-file-warning-threshold', \
-allow user to view file with `vlf', open it normally or abort.
+allow user to view file with `vlf', open it normally, or abort.
 OP-TYPE specifies the file operation being performed over FILENAME."
   (and large-file-warning-threshold size
        (> size large-file-warning-threshold)
@@ -226,10 +227,9 @@ With FROM-END prefix, start from the back."
   (interactive)
   (vlf-insert-file t))
 
-(defun vlf-revert (&optional ignore-auto noconfirm)
+(defun vlf-revert (&optional _ignore-auto noconfirm)
   "Revert current chunk.  Ignore IGNORE-AUTO.
 Ask for confirmation if NOCONFIRM is nil."
-  (ignore ignore-auto)
   (or noconfirm
       (yes-or-no-p (format "Revert buffer from file %s? "
                            buffer-file-name))
