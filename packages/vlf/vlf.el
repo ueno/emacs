@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2006, 2012, 2013  Free Software Foundation, Inc.
 
-;; Version: 0.7
+;; Version: 0.8
 ;; Keywords: large files, utilities
 ;; Authors: 2006 Mathias Dahl <mathias.dahl@gmail.com>
 ;;          2012 Sam Steingold <sds@gnu.org>
@@ -64,6 +64,7 @@
         (vlf-change-batch-size t)))
     (define-key map "s" 'vlf-re-search-forward)
     (define-key map "r" 'vlf-re-search-backward)
+    (define-key map "o" 'vlf-occur)
     (define-key map "[" 'vlf-beginning-of-file)
     (define-key map "]" 'vlf-end-of-file)
     (define-key map "e" 'vlf-edit-mode)
@@ -376,12 +377,12 @@ Return number of bytes moved back for this to happen."
          (match-start-pos (+ vlf-start-pos (position-bytes (point))))
          (match-end-pos match-start-pos)
          (to-find count)
-         (search-reporter (make-progress-reporter
-                           (concat "Searching for " regexp "...")
-                           (if backward
-                               (- vlf-file-size vlf-end-pos)
-                             vlf-start-pos)
-                           vlf-file-size))
+         (reporter (make-progress-reporter
+                    (concat "Searching for " regexp "...")
+                    (if backward
+                        (- vlf-file-size vlf-end-pos)
+                      vlf-start-pos)
+                    vlf-file-size))
          (batch-step (/ vlf-batch-size 8))) ; amount of chunk overlap
     (unwind-protect
         (catch 'end-of-file
@@ -414,8 +415,8 @@ Return number of bytes moved back for this to happen."
                                             (point-max))
                                       (point-max)))
                          (progress-reporter-update
-                          search-reporter (- vlf-file-size
-                                             vlf-start-pos)))))
+                          reporter (- vlf-file-size
+                                      vlf-start-pos)))))
             (while (not (zerop to-find))
               (cond ((re-search-forward regexp nil t)
                      (setq to-find (1- to-find)
@@ -440,9 +441,9 @@ Return number of bytes moved back for this to happen."
                                               vlf-start-pos))
                                           (point-max))
                                     (point-min)))
-                       (progress-reporter-update search-reporter
+                       (progress-reporter-update reporter
                                                  vlf-end-pos)))))
-          (progress-reporter-done search-reporter))
+          (progress-reporter-done reporter))
       (if backward
           (vlf-goto-match match-chunk-start match-chunk-end
                            match-end-pos match-start-pos
@@ -477,7 +478,7 @@ successful.  Return nil if nothing found."
                                      (- match-pos-start
                                         vlf-start-pos))
                                     match-end)))
-        (overlay-put overlay 'face 'region)
+        (overlay-put overlay 'face 'match)
         (unless success
           (goto-char match-end)
           (message "Moved to the %d match which is last"
@@ -519,6 +520,177 @@ Search is performed chunk by chunk in `vlf-batch-size' memory."
       (unless success
         (vlf-move-to-chunk start-pos end-pos)
         (goto-char pos)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; occur
+
+(defvar vlf-occur-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "n" 'vlf-occur-next-match)
+    (define-key map "p" 'vlf-occur-prev-match)
+    (define-key map "\C-m" 'vlf-occur-visit)
+    (define-key map [mouse-1] 'vlf-occur-visit)
+    map)
+  "Keymap for command `vlf-occur-mode'.")
+
+(define-derived-mode vlf-occur-mode special-mode "VLF[occur]"
+  "Major mode for showing occur matches of VLF opened files.")
+
+(defun vlf-occur-next-match ()
+  "Move cursor to next match."
+  (interactive)
+  (if (eq (get-char-property (point) 'face) 'match)
+      (goto-char (next-single-property-change (point) 'face)))
+  (goto-char (or (text-property-any (point) (point-max) 'face 'match)
+                 (text-property-any (point-min) (point)
+                                    'face 'match))))
+
+(defun vlf-occur-prev-match ()
+  "Move cursor to previous match."
+  (interactive)
+  (if (eq (get-char-property (point) 'face) 'match)
+      (goto-char (previous-single-property-change (point) 'face)))
+  (while (not (eq (get-char-property (point) 'face) 'match))
+    (goto-char (or (previous-single-property-change (point) 'face)
+                   (point-max)))))
+
+(defun vlf-occur-visit (&optional event)
+  "Visit current `vlf-occur' link in a vlf buffer.
+The same for mouse EVENT."
+  (interactive (list last-nonmenu-event))
+  (when event
+    (switch-to-buffer (window-buffer (posn-window (event-end event))))
+    (goto-char (posn-point (event-end event))))
+  (let* ((pos (point))
+         (pos-relative (- pos (line-beginning-position) 1))
+         (file (get-char-property pos 'file)))
+    (if file
+        (let ((chunk-start (get-char-property pos 'chunk-start))
+              (chunk-end (get-char-property pos 'chunk-end))
+              (buffer (get-char-property pos 'buffer))
+              (match-pos (or (get-char-property pos 'match-pos)
+                             (+ (get-char-property pos 'line-pos)
+                                pos-relative))))
+          (unless (buffer-live-p buffer)
+            (let ((occur-buffer (current-buffer)))
+              (setq buffer (vlf file))
+              (switch-to-buffer occur-buffer)))
+          (pop-to-buffer buffer)
+          (vlf-move-to-chunk chunk-start chunk-end)
+          (set-buffer buffer)
+          (goto-char match-pos)))))
+
+(defun vlf-occur (regexp)
+  "Make occur style index for REGEXP."
+  (interactive (list (read-regexp "List lines matching regexp"
+                                  (if regexp-history
+                                      (car regexp-history)))))
+  (let ((start-pos vlf-start-pos)
+        (end-pos vlf-end-pos)
+        (pos (point)))
+    (vlf-beginning-of-file)
+    (goto-char (point-min))
+    (vlf-build-occur regexp)
+    (vlf-move-to-chunk start-pos end-pos)
+    (goto-char pos)))
+
+(defun vlf-build-occur (regexp)
+  "Build occur style index for REGEXP."
+  (let ((line 1)
+        (last-match-line 0)
+        (last-line-pos (point-min))
+        (file buffer-file-name)
+        (total-matches 0)
+        (match-end-pos (+ vlf-start-pos (position-bytes (point))))
+        (occur-buffer (generate-new-buffer
+                       (concat "*VLF-occur " (file-name-nondirectory
+                                               buffer-file-name)
+                               "*")))
+        (line-regexp (concat "\\(?5:[\n\C-m]\\)\\|\\(?10:"
+                             regexp "\\)"))
+        (batch-step (/ vlf-batch-size 8))
+        (reporter (make-progress-reporter
+                   (concat "Building index for " regexp "...")
+                   vlf-start-pos vlf-file-size)))
+    (unwind-protect
+        (progn
+          (while (/= vlf-end-pos vlf-file-size)
+            (if (re-search-forward line-regexp nil t)
+                (progn
+                  (setq match-end-pos (+ vlf-start-pos
+                                         (position-bytes
+                                          (match-end 0))))
+                  (if (match-string 5)
+                      (setq line (1+ line)
+                            last-line-pos (point))
+                    (let* ((chunk-start vlf-start-pos)
+                           (chunk-end vlf-end-pos)
+                           (vlf-buffer (current-buffer))
+                           (line-pos (line-beginning-position))
+                           (line-text (buffer-substring
+                                       line-pos (line-end-position))))
+                      (with-current-buffer occur-buffer
+                        (unless (= line last-match-line)
+                          (insert "\n:")
+                          (let* ((overlay-pos (1- (point)))
+                                 (overlay (make-overlay
+                                           overlay-pos
+                                           (1+ overlay-pos))))
+                            (overlay-put overlay 'before-string
+                                         (propertize
+                                          (number-to-string line)
+                                          'face 'shadow)))
+                          (insert (propertize line-text
+                                              'file file
+                                              'buffer vlf-buffer
+                                              'chunk-start chunk-start
+                                              'chunk-end chunk-end
+                                              'mouse-face '(highlight)
+                                              'line-pos line-pos
+                                              'help-echo
+                                              (format "Move to line %d"
+                                                      line))))
+                        (setq last-match-line line
+                              total-matches (1+ total-matches))
+                        (let ((line-start (+ (line-beginning-position)
+                                             1))
+                              (match-pos (match-beginning 10)))
+                          (add-text-properties
+                           (+ line-start match-pos (- last-line-pos))
+                           (+ line-start (match-end 10)
+                              (- last-line-pos))
+                           (list 'face 'match 'match-pos match-pos
+                                 'help-echo
+                                 (format "Move to match %d"
+                                         total-matches))))))))
+              (let ((batch-move (- vlf-end-pos batch-step)))
+                (vlf-move-to-batch (if (< batch-move match-end-pos)
+                                        match-end-pos
+                                      batch-move) t))
+              (goto-char (if (< vlf-start-pos match-end-pos)
+                             (or (byte-to-position (- match-end-pos
+                                                      vlf-start-pos))
+                                 (point-min))
+                           (point-min)))
+              (setq last-match-line 0
+                    last-line-pos (point-min))
+              (progress-reporter-update reporter vlf-end-pos)))
+          (progress-reporter-done reporter))
+      (if (zerop total-matches)
+          (progn (with-current-buffer occur-buffer
+                   (set-buffer-modified-p nil))
+                 (kill-buffer occur-buffer)
+                 (message "No matches for \"%s\"" regexp))
+        (with-current-buffer occur-buffer
+          (goto-char (point-min))
+          (insert (propertize
+                   (format "%d matches from %d lines for \"%s\" \
+in file: %s" total-matches line regexp file)
+                   'face 'underline))
+          (set-buffer-modified-p nil)
+          (forward-char)
+          (vlf-occur-mode))
+        (display-buffer occur-buffer)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; editing
