@@ -149,21 +149,15 @@ See `with-eldoc-in-minibuffer'."
 
 (defun eldoc-mode-in-minibuffer ()
   "Show eldoc for current minibuffer input."
-  (let ((buf (with-selected-window (minibuffer-window)
-               (buffer-name))))
+  (let ((buf (window-buffer (minibuffer-window))))
     ;; If this minibuffer have been started with
     ;;`with-eldoc-in-minibuffer' give it eldoc support
     ;; and update mode-line, otherwise do nothing.
     (when (member buf eldoc-active-minibuffers-list)
-      (let* ((str-all (with-current-buffer buf
-                        (minibuffer-completion-contents)))
-             (sym     (when str-all
-                        (with-temp-buffer
-                          (insert str-all)
-                          (goto-char (point-max))
-                          (unless (looking-back ")\\|\"")
-                            (forward-char -1))
-                          (eldoc-current-symbol))))
+      (let* ((sym (with-current-buffer buf
+                    (unless (looking-back ")\\|\"")
+                      (forward-char -1))
+                    (eldoc-current-symbol)))
              (info-fn (eldoc-fnsym-in-current-sexp))
              (doc     (or (eldoc-get-var-docstring sym)
                           (eldoc-get-fnsym-args-string
