@@ -2,12 +2,13 @@
 
 ;; Copyright (C) 2006, 2012, 2013  Free Software Foundation, Inc.
 
-;; Version: 0.9
+;; Version: 0.9.1
 ;; Keywords: large files, utilities
 ;; Maintainer: Andrey Kotlarski <m00naticus@gmail.com>
 ;; Authors: 2006 Mathias Dahl <mathias.dahl@gmail.com>
 ;;          2012 Sam Steingold <sds@gnu.org>
 ;;          2013 Andrey Kotlarski <m00naticus@gmail.com>
+;; URL: https://github.com/m00natic/vlf
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -46,12 +47,21 @@
   "Defines how large each batch of file data is (in bytes)."
   :type 'integer
   :group 'vlf)
+(put 'vlf-batch-size 'permanent-local t)
 
 ;;; Keep track of file position.
 (defvar vlf-start-pos 0
   "Absolute position of the visible chunk start.")
+(put 'vlf-start-pos 'permanent-local t)
+
 (defvar vlf-end-pos 0 "Absolute position of the visible chunk end.")
+(put 'vlf-end-pos 'permanent-local t)
+
 (defvar vlf-file-size 0 "Total size of presented file.")
+(put 'vlf-file-size 'permanent-local t)
+
+(defvar vlf-encode-size 0 "Size in bytes of current batch decoded.")
+(put 'vlf-encode-size 'permanent-local t)
 
 (defvar vlf-mode-map
   (let ((map (make-sparse-keymap)))
@@ -78,18 +88,14 @@
   (setq buffer-read-only t)
   (set-buffer-modified-p nil)
   (buffer-disable-undo)
-  (make-local-variable 'write-file-functions)
-  (add-hook 'write-file-functions 'vlf-write)
+  (add-hook 'write-file-functions 'vlf-write nil t)
   (make-local-variable 'revert-buffer-function)
   (setq revert-buffer-function 'vlf-revert)
   (make-local-variable 'vlf-batch-size)
-  (put 'vlf-batch-size 'permanent-local t)
   (make-local-variable 'vlf-start-pos)
-  (put 'vlf-start-pos 'permanent-local t)
   (make-local-variable 'vlf-end-pos)
-  (put 'vlf-end-pos 'permanent-local t)
   (make-local-variable 'vlf-file-size)
-  (put 'vlf-file-size 'permanent-local t))
+  (make-local-variable 'vlf-encode-size))
 
 ;;;###autoload
 (defun vlf (file)
@@ -99,9 +105,9 @@ buffer.  You can customize number of bytes displayed by customizing
 `vlf-batch-size'."
   (interactive "fFile to open: ")
   (with-current-buffer (generate-new-buffer "*vlf*")
+    (set-visited-file-name file)
     (vlf-mode)
-    (setq buffer-file-name file
-          vlf-file-size (vlf-get-file-size file))
+    (setq vlf-file-size (vlf-get-file-size buffer-file-name))
     (vlf-insert-file)
     (switch-to-buffer (current-buffer))))
 
@@ -119,7 +125,10 @@ buffer.  You can customize number of bytes displayed by customizing
   '(define-key dired-mode-map "V" 'dired-vlf))
 
 ;;;###autoload
-(defun vlf-if-file-too-large (size op-type &optional filename)
+(defadvice abort-if-file-too-large (around vlf-if-file-too-large
+                                           (size op-type
+                                                 &optional filename)
+                                           compile activate)
   "If file SIZE larger than `large-file-warning-threshold', \
 allow user to view file with `vlf', open it normally, or abort.
 OP-TYPE specifies the file operation being performed over FILENAME."
@@ -146,15 +155,12 @@ OP-TYPE specifies the file operation being performed over FILENAME."
                ((memq char '(?a ?A))
                 (error "Aborted"))))))
 
-;; hijack `abort-if-file-too-large'
-;;;###autoload
-(fset 'abort-if-file-too-large 'vlf-if-file-too-large)
 
 ;; scroll auto batching
 (defadvice scroll-up (around vlf-scroll-up
                              activate compile)
   "Slide to next batch if at end of buffer in `vlf-mode'."
-  (if (and (eq major-mode 'vlf-mode)
+  (if (and (derived-mode-p 'vlf-mode)
            (eobp))
       (progn (vlf-next-batch 1)
              (goto-char (point-min)))
@@ -163,13 +169,14 @@ OP-TYPE specifies the file operation being performed over FILENAME."
 (defadvice scroll-down (around vlf-scroll-down
                                activate compile)
   "Slide to previous batch if at beginning of buffer  in `vlf-mode'."
-  (if (and (eq major-mode 'vlf-mode)
+  (if (and (derived-mode-p 'vlf-mode)
            (bobp))
       (progn (vlf-prev-batch 1)
              (goto-char (point-max)))
     ad-do-it))
 
 ;; non-recent Emacs
+;;;###autoload
 (unless (fboundp 'file-size-human-readable)
   (defun file-size-human-readable (file-size)
     "Print FILE-SIZE in MB."
@@ -183,8 +190,6 @@ OP-TYPE specifies the file operation being performed over FILENAME."
 Normally, the value is doubled;
 with the prefix argument DECREASE it is halved."
   (interactive "P")
-  (or (assq 'vlf-batch-size (buffer-local-variables))
-      (error "%s is not local in this buffer" 'vlf-batch-size))
   (setq vlf-batch-size (if decrease
                             (/ vlf-batch-size 2)
                           (* vlf-batch-size 2)))
@@ -207,6 +212,12 @@ with the prefix argument DECREASE it is halved."
   "Get size in bytes of FILE."
   (nth 7 (file-attributes file)))
 
+(defun vlf-verify-size ()
+  "Update file size information if necessary and visited file time."
+  (unless (verify-visited-file-modtime (current-buffer))
+    (setq vlf-file-size (vlf-get-file-size buffer-file-name))
+    (set-visited-file-modtime)))
+
 (defun vlf-insert-file (&optional from-end)
   "Insert first chunk of current file contents in current buffer.
 With FROM-END prefix, start from the back."
@@ -228,11 +239,11 @@ With FROM-END prefix, start from the back."
   (vlf-insert-file t))
 
 (defun vlf-revert (&optional _ignore-auto noconfirm)
-  "Revert current chunk.  Ignore IGNORE-AUTO.
+  "Revert current chunk.  Ignore _IGNORE-AUTO.
 Ask for confirmation if NOCONFIRM is nil."
-  (or noconfirm
-      (yes-or-no-p (format "Revert buffer from file %s? "
-                           buffer-file-name))
+  (if (or noconfirm
+          (yes-or-no-p (format "Revert buffer from file %s? "
+                               buffer-file-name)))
       (vlf-move-to-chunk vlf-start-pos vlf-end-pos)))
 
 (defun vlf-jump-to-chunk (n)
@@ -250,8 +261,7 @@ When prefix argument is supplied and positive
 When prefix argument is negative
  append next APPEND number of batches to the existing buffer."
   (interactive "p")
-  (or (verify-visited-file-modtime (current-buffer))
-      (setq vlf-file-size (vlf-get-file-size buffer-file-name)))
+  (vlf-verify-size)
   (let ((end (min (+ vlf-end-pos (* vlf-batch-size
                                      (abs append)))
                   vlf-file-size)))
@@ -282,8 +292,7 @@ When prefix argument is negative
   (interactive "p")
   (if (zerop vlf-start-pos)
       (error "Already at BOF"))
-  (or (verify-visited-file-modtime (current-buffer))
-      (setq vlf-file-size (vlf-get-file-size buffer-file-name)))
+  (vlf-verify-size)
   (let ((inhibit-read-only t)
         (start (max 0 (- vlf-start-pos (* vlf-batch-size
                                            (abs prepend)))))
@@ -299,8 +308,8 @@ When prefix argument is negative
                           (if do-prepend
                               vlf-start-pos
                             vlf-end-pos))
-    (setq vlf-start-pos start)
-    (setq pos (+ pos (vlf-adjust-chunk)))
+    (setq vlf-start-pos start
+          pos (+ pos (vlf-adjust-chunk)))
     (goto-char (or (byte-to-position (- (position-bytes (point-max))
                                         pos))
                    (point-max))))
@@ -312,8 +321,7 @@ When prefix argument is negative
   "Move to batch determined by START.
 Adjust according to file start/end and show `vlf-batch-size' bytes.
 When given MINIMAL flag, skip non important operations."
-  (or (verify-visited-file-modtime (current-buffer))
-      (setq vlf-file-size (vlf-get-file-size buffer-file-name)))
+  (vlf-verify-size)
   (setq vlf-start-pos (max 0 start)
         vlf-end-pos (min (+ vlf-start-pos vlf-batch-size)
                           vlf-file-size))
@@ -333,8 +341,7 @@ When given MINIMAL flag, skip non important operations."
 (defun vlf-move-to-chunk (start end &optional minimal)
   "Move to chunk determined by START END.
 When given MINIMAL flag, skip non important operations."
-  (or (verify-visited-file-modtime (current-buffer))
-      (setq vlf-file-size (vlf-get-file-size buffer-file-name)))
+  (vlf-verify-size)
   (setq vlf-start-pos (max 0 start)
         vlf-end-pos (min end vlf-file-size))
   (let ((inhibit-read-only t)
@@ -350,15 +357,18 @@ When given MINIMAL flag, skip non important operations."
 
 (defun vlf-adjust-chunk ()
   "Adjust chunk beginning until content can be properly decoded.
+Set `vlf-encode-size' to size of buffer when encoded.
 Return number of bytes moved back for this to happen."
   (let ((shift 0)
         (chunk-size (- vlf-end-pos vlf-start-pos)))
-    (while (and (not (zerop vlf-start-pos))
-                (< shift 4)
-                (/= chunk-size
-                    (length (encode-coding-region
-                             (point-min) (point-max)
-                             buffer-file-coding-system t))))
+    (while (and (< shift 4)
+                (< 4 (abs (- chunk-size
+                             (setq vlf-encode-size
+                                   (length (encode-coding-region
+                                            (point-min) (point-max)
+                                            buffer-file-coding-system
+                                            t))))))
+                (not (zerop vlf-start-pos)))
       (setq shift (1+ shift)
             vlf-start-pos (1- vlf-start-pos)
             chunk-size (1+ chunk-size))
@@ -759,17 +769,19 @@ or \\[vlf-discard-edit] to discard changes.")))
 
 (defun vlf-write ()
   "Write current chunk to file.  Always return true to disable save.
-If changing size of chunk shift remaining file content."
+If changing size of chunk, shift remaining file content."
   (interactive)
   (when (and (buffer-modified-p)
              (or (verify-visited-file-modtime (current-buffer))
                  (y-or-n-p "File has changed since visited or saved.  \
 Save anyway? ")))
     (let ((pos (point))
-          (size-change (- vlf-end-pos vlf-start-pos
-                          (length (encode-coding-region
-                                   (point-min) (point-max)
-                                   buffer-file-coding-system t)))))
+          (size-change (- vlf-encode-size
+                          (setq vlf-encode-size
+                                (length (encode-coding-region
+                                         (point-min) (point-max)
+                                         buffer-file-coding-system
+                                         t))))))
       (cond ((zerop size-change)
              (write-region nil nil buffer-file-name vlf-start-pos t))
             ((< 0 size-change)
@@ -795,6 +807,7 @@ Save anyway? ")))
       (progress-reporter-update reporter read-start-pos))
     ;; pad end with space
     (erase-buffer)
+    (vlf-verify-size)
     (insert-char 32 size-change)
     (write-region nil nil buffer-file-name (- vlf-file-size
                                               size-change) t)
@@ -804,8 +817,7 @@ Save anyway? ")))
   "Read `vlf-batch-size' bytes from READ-POS and write them \
 back at WRITE-POS.  Return nil if EOF is reached, t otherwise."
   (erase-buffer)
-  (or (verify-visited-file-modtime (current-buffer))
-      (setq vlf-file-size (vlf-get-file-size buffer-file-name)))
+  (vlf-verify-size)
   (let ((read-end (+ read-pos vlf-batch-size)))
     (insert-file-contents-literally buffer-file-name nil
                                     read-pos
@@ -839,8 +851,7 @@ Done by saving content up front and then writing previous batch."
 Then write initial buffer content to file at WRITE-POS.
 If HIDE-READ is non nil, temporarily hide literal read content.
 Return nil if EOF is reached, t otherwise."
-  (or (verify-visited-file-modtime (current-buffer))
-      (setq vlf-file-size (vlf-get-file-size buffer-file-name)))
+  (vlf-verify-size)
   (let ((read-more (< read-pos vlf-file-size))
         (start-write-pos (point-min))
         (end-write-pos (point-max)))
