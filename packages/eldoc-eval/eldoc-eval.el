@@ -76,6 +76,23 @@ Should take one arg: the string to display"
   :group 'lisp
   :type 'boolean)
 
+;;; Compatibility with Emacs-24.4
+;; New implementation of eldoc in minibuffer that come
+;; with Emacs-24.4 show the eldoc info of current-buffer while
+;; minibuffer is in use, disable this and inline old Emacs behavior.
+
+(when (boundp 'eldoc-message-function)
+  (setq eldoc-message-function 'message)
+
+  (defun eldoc-display-message-no-interference-p ()
+    (and eldoc-mode
+         (not executing-kbd-macro)
+         (not (and (boundp 'edebug-active) edebug-active))
+         ;; Having this mode operate in an active minibuffer/echo area causes
+         ;; interference with what's going on there.
+         (not cursor-in-echo-area)
+         (not (eq (selected-window) (minibuffer-window))))))
+
 ;; Internal.
 (defvar eldoc-active-minibuffers-list nil
   "List of active minibuffers with eldoc enabled.")
@@ -149,20 +166,25 @@ See `with-eldoc-in-minibuffer'."
 
 (defun eldoc-mode-in-minibuffer ()
   "Show eldoc for current minibuffer input."
-  (let ((buf (window-buffer (minibuffer-window))))
+  (let ((buf (buffer-name (window-buffer (active-minibuffer-window)))))
     ;; If this minibuffer have been started with
     ;;`with-eldoc-in-minibuffer' give it eldoc support
     ;; and update mode-line, otherwise do nothing.
-    (when (member buf eldoc-active-minibuffers-list)
-      (let* ((sym (with-current-buffer buf
-                    (unless (looking-back ")\\|\"")
-                      (forward-char -1))
-                    (eldoc-current-symbol)))
-             (info-fn (eldoc-fnsym-in-current-sexp))
-             (doc     (or (eldoc-get-var-docstring sym)
-                          (eldoc-get-fnsym-args-string
-                           (car info-fn) (cadr info-fn)))))
-        (when doc (funcall eldoc-in-minibuffer-show-fn doc))))))
+    (condition-case err
+        (when (member buf eldoc-active-minibuffers-list)
+          (with-current-buffer buf
+            (let* ((sym (save-excursion
+                          (unless (looking-back ")\\|\"")
+                            (forward-char -1))
+                          (eldoc-current-symbol)))
+                   (info-fn (eldoc-fnsym-in-current-sexp))
+                   (doc     (or (eldoc-get-var-docstring sym)
+                                (eldoc-get-fnsym-args-string
+                                 (car info-fn) (cadr info-fn)))))
+              (when doc (funcall eldoc-in-minibuffer-show-fn doc)))))
+      (scan-error nil)
+      (beginning-of-buffer nil)
+      (error (message "Eldoc in minibuffer error: %S" err)))))
 
 (defun eval-expression-with-eldoc ()
   "Eval expression with eldoc support in mode-line."
