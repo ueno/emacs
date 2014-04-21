@@ -1,3 +1,7 @@
+2014-04-21  Daniel Colascione  <dancol@dancol.org>
+
+	* emacs-lisp/cl-macs.el: Untabify file.
+
 2014-04-20  Daniel Colascione  <dancol@dancol.org>
 
 	* vc/vc.el (vc-root-dir): New public autoloaded function for
