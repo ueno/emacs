@@ -813,6 +813,10 @@ extern struct font_driver nsfont_driver;
 extern void syms_of_nsfont (void);
 extern void syms_of_macfont (void);
 #endif	/* HAVE_NS */
+#ifdef HAVE_WL
+extern struct font_driver wlfont_driver;
+extern void syms_of_wlfont (void);
+#endif	/* HAVE_WL */
 
 #ifndef FONT_DEBUG
 #define FONT_DEBUG

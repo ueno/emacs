@@ -231,6 +231,10 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #ifdef HAVE_NS
 #define GCGraphicsExposures 0
 #endif /* HAVE_NS */
+
+#ifdef HAVE_WL
+#define GCGraphicsExposures 0
+#endif /* HAVE_WL */
 #endif /* HAVE_WINDOW_SYSTEM */
 
 #include "buffer.h"
@@ -630,8 +634,8 @@ x_free_gc (struct frame *f, GC gc)
 
 #endif  /* HAVE_NTGUI */
 
-#ifdef HAVE_NS
-/* NS emulation of GCs */
+#if defined(HAVE_NS) || defined(HAVE_WL)
+/* NS and WL emulation of GCs */
 
 static GC
 x_create_gc (struct frame *f,
@@ -648,7 +652,7 @@ x_free_gc (struct frame *f, GC gc)
 {
   xfree (gc);
 }
-#endif  /* HAVE_NS */
+#endif  /* HAVE_NS || HAVE_WL */
 
 /***********************************************************************
 			   Frames and faces
@@ -1044,6 +1048,10 @@ defined_color (struct frame *f, const char *color_name, XColor *color_def,
 #ifdef HAVE_NS
   else if (FRAME_NS_P (f))
     return ns_defined_color (f, color_name, color_def, alloc, 1);
+#endif
+#ifdef HAVE_WL
+  else if (FRAME_WL_P (f))
+    return ewl_defined_color (f, color_name, color_def, alloc);
 #endif
   else
     emacs_abort ();

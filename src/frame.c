@@ -62,7 +62,7 @@ Lisp_Object Qns_parse_geometry;
 Lisp_Object Qframep, Qframe_live_p;
 Lisp_Object Qicon, Qmodeline;
 Lisp_Object Qonly, Qnone;
-Lisp_Object Qx, Qw32, Qpc, Qns;
+Lisp_Object Qx, Qw32, Qpc, Qns, Qwl;
 Lisp_Object Qvisible;
 Lisp_Object Qdisplay_type;
 static Lisp_Object Qbackground_mode;
@@ -275,6 +275,8 @@ See also `frame-live-p'.  */)
       return Qpc;
     case output_ns:
       return Qns;
+    case output_wl:
+      return Qwl;
     default:
       emacs_abort ();
     }
@@ -4560,6 +4562,7 @@ syms_of_frame (void)
   DEFSYM (Qw32, "w32");
   DEFSYM (Qpc, "pc");
   DEFSYM (Qns, "ns");
+  DEFSYM (Qwl, "wl");
   DEFSYM (Qvisible, "visible");
   DEFSYM (Qbuffer_predicate, "buffer-predicate");
   DEFSYM (Qbuffer_list, "buffer-list");

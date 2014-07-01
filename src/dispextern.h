@@ -80,6 +80,14 @@ typedef Pixmap XImagePtr;
 typedef XImagePtr XImagePtr_or_DC;
 #endif
 
+#ifdef HAVE_WL
+#include "wlgui.h"
+/* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
+typedef struct ewl_display_info Display_Info;
+typedef Pixmap XImagePtr;
+typedef XImagePtr XImagePtr_or_DC;
+#endif
+
 #ifdef HAVE_WINDOW_SYSTEM
 # include <time.h>
 #endif
@@ -1344,6 +1352,9 @@ struct glyph_string
   XGCValues *gc;
   HDC hdc;
 #endif
+#if defined (HAVE_WL)
+  XGCValues *gc;
+#endif
 
   /* A pointer to the first glyph in the string.  This glyph
      corresponds to char2b[0].  Needed to draw rectangles if
@@ -1716,7 +1727,7 @@ struct face
      attributes except the font.  */
   struct face *ascii_face;
 
-#ifdef HAVE_XFT
+#if defined (HAVE_XFT) || defined (HAVE_WL)
   /* Extra member that a font-driver uses privately.  */
   void *extra;
 #endif  
@@ -3304,7 +3315,7 @@ bool valid_image_p (Lisp_Object);
 void prepare_image_for_display (struct frame *, struct image *);
 ptrdiff_t lookup_image (struct frame *, Lisp_Object);
 
-#if defined (HAVE_X_WINDOWS) ||  defined (HAVE_NS)
+#if defined (HAVE_X_WINDOWS) ||  defined (HAVE_NS) || defined (HAVE_WL)
 #define RGB_PIXEL_COLOR unsigned long
 #endif
 

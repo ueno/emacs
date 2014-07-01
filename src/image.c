@@ -109,6 +109,21 @@ typedef struct ns_bitmap_record Bitmap_Record;
 #define DefaultDepthOfScreen(screen) x_display_list->n_planes
 #endif /* HAVE_NS */
 
+#ifdef HAVE_WL
+#undef COLOR_TABLE_SUPPORT
+
+typedef struct ewl_bitmap_record Bitmap_Record;
+
+#define GET_PIXEL(ximg, x, y) XGetPixel (ximg, x, y)
+#define NO_PIXMAP 0
+
+#define PIX_MASK_RETAIN	0
+#define PIX_MASK_DRAW	1
+
+#define x_defined_color ewl_defined_color
+#define DefaultDepthOfScreen(screen) x_display_list->n_planes
+#endif /* HAVE_WL */
+
 
 /* The symbol `postscript' identifying images of this type.  */
 
@@ -154,6 +169,22 @@ XPutPixel (XImagePtr ximage, int x, int y, unsigned long pixel)
   ns_put_pixel (ximage, x, y, pixel);
 }
 #endif /* HAVE_NS */
+
+#ifdef HAVE_WL
+/* Use with images created by ns_image_for_XPM.  */
+static unsigned long
+XGetPixel (XImagePtr ximage, int x, int y)
+{
+  return 0;
+}
+
+/* Use with images created by ns_image_for_XPM; alpha set to 1;
+   pixel is assumed to be in RGB form.  */
+static void
+XPutPixel (XImagePtr ximage, int x, int y, unsigned long pixel)
+{
+}
+#endif /* HAVE_WL */
 
 
 /* Functions to access the contents of a bitmap, given an id.  */
@@ -1162,6 +1193,10 @@ four_corners_best (XImagePtr_or_DC ximg, int *corners,
 
 #define Free_Pixmap(display, pixmap) \
   ns_release_object (pixmap)
+
+#elif defined (HAVE_WL)
+
+#define Free_Pixmap(display, pixmap) \
 
 #else
 
@@ -2691,6 +2726,8 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
 #elif defined (HAVE_NS)
   img->pixmap = ns_image_from_XBM (data, img->width, img->height);
 
+#elif defined (HAVE_WL)
+  img->pixmap = NO_PIXMAP;
 #else
   img->pixmap =
    (x_check_image_size (0, img->width, img->height)
@@ -4885,6 +4922,7 @@ x_disable_image (struct frame *f, struct image *img)
     {
 #ifndef HAVE_NTGUI
 #ifndef HAVE_NS  /* TODO: NS support, however this not needed for toolbars */
+#ifndef HAVE_WL
 
 #define MaskForeground(f)  WHITE_PIX_DEFAULT (f)
 
@@ -4910,6 +4948,7 @@ x_disable_image (struct frame *f, struct image *img)
 		     img->width - 1, 0);
 	  XFreeGC (dpy, gc);
 	}
+#endif /* !HAVE_WL */
 #endif /* !HAVE_NS */
 #else
       HDC hdc, bmpdc;

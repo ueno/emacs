@@ -6126,6 +6126,19 @@ init_display (void)
     }
 #endif
 
+#ifdef HAVE_WL
+  if (!inhibit_window_system
+#ifndef CANNOT_DUMP
+     && initialized
+#endif
+      )
+    {
+      Vinitial_window_system = Qwl;
+      Vwindow_system_version = make_number (1);
+      return;
+    }
+#endif
+
   /* If no window system has been specified, try to use the terminal.  */
   if (! isatty (0))
     fatal ("standard input is not a tty");

@@ -322,6 +322,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #define FRAME_X_OUTPUT(f) ((f)->output_data.x)
 #endif
 
+#undef INFINITY
 #define INFINITY 10000000
 
 Lisp_Object Qoverriding_local_map, Qoverriding_terminal_local_map;

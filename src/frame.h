@@ -327,6 +327,7 @@ struct frame
     struct x_output *x;         /* From xterm.h.  */
     struct w32_output *w32;     /* From w32term.h.  */
     struct ns_output *ns;       /* From nsterm.h.  */
+    struct ewl_output *wl;	/* From wlterm.h.  */
     intptr_t nothing;
   }
   output_data;
@@ -624,6 +625,11 @@ default_pixels_per_inch_y (void)
 #else
 #define FRAME_NS_P(f) ((f)->output_method == output_ns)
 #endif
+#ifndef HAVE_WL
+#define FRAME_WL_P(f) false
+#else
+#define FRAME_WL_P(f) ((f)->output_method == output_wl)
+#endif
 
 /* FRAME_WINDOW_P tests whether the frame is a window, and is
    defined to be the predicate for the window system being used.  */
@@ -636,6 +642,9 @@ default_pixels_per_inch_y (void)
 #endif
 #ifdef HAVE_NS
 #define FRAME_WINDOW_P(f) FRAME_NS_P(f)
+#endif
+#ifdef HAVE_WL
+#define FRAME_WINDOW_P(f) FRAME_WL_P(f)
 #endif
 #ifndef FRAME_WINDOW_P
 #define FRAME_WINDOW_P(f) ((void) (f), false)
@@ -1249,7 +1258,7 @@ extern Lisp_Object Qalpha;
 extern Lisp_Object Qleft_fringe, Qright_fringe;
 extern Lisp_Object Qheight, Qwidth;
 extern Lisp_Object Qminibuffer, Qmodeline;
-extern Lisp_Object Qx, Qw32, Qpc, Qns;
+extern Lisp_Object Qx, Qw32, Qpc, Qns, Qwl;
 extern Lisp_Object Qvisible;
 extern Lisp_Object Qdisplay_type;
 
@@ -1344,7 +1353,7 @@ extern void x_query_colors (struct frame *f, XColor *, int);
 extern void x_query_color (struct frame *f, XColor *);
 extern void x_focus_frame (struct frame *);
 
-#ifndef HAVE_NS
+#if !defined(HAVE_NS) && !defined(HAVE_WL)
 
 extern int x_bitmap_icon (struct frame *, Lisp_Object);
 

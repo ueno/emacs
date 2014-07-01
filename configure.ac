@@ -315,6 +315,7 @@ OPTION_DEFAULT_ON([xaw3d],[don't use Xaw3d])
 OPTION_DEFAULT_ON([xim],[don't use X11 XIM])
 OPTION_DEFAULT_OFF([ns],[use NeXTstep (Cocoa or GNUstep) windowing system])
 OPTION_DEFAULT_OFF([w32], [use native MS Windows GUI in a Cygwin build])
+OPTION_DEFAULT_OFF([wl], [use Wayland])
 
 OPTION_DEFAULT_ON([gpm],[don't use -lgpm for mouse support on a GNU/Linux console])
 OPTION_DEFAULT_ON([dbus],[don't compile with D-Bus support])
@@ -1937,6 +1938,30 @@ if test "${HAVE_W32}" = "yes"; then
   with_xft=no
 fi
 
+HAVE_WL=no
+if test "${with_wl}" != "no"; then
+  WL_MODULES="fontconfig >= 2.2.0 freetype2 xkbcommon wayland-client cairo"
+
+  dnl Checks for libraries.
+  EMACS_CHECK_MODULES([WL], [$WL_MODULES],
+    [pkg_check_wl=yes], [pkg_check_wl=no])
+  if test "$pkg_check_wl" = "no" && test "$with_wl" = "yes"; then
+    AC_MSG_ERROR($WL_PKG_ERRORS)
+  fi
+  if test "$pkg_check_wl" = "yes"; then
+    HAVE_WL=yes
+    WL_OBJ="wlterm.o wlfns.o wlfont.o ftfont.o"
+    window_system=wl
+    AC_DEFINE(HAVE_FREETYPE)
+  fi
+fi
+
+AC_SUBST(WL_OBJ)
+
+if test "${HAVE_WL}" = "yes"; then
+   AC_DEFINE(HAVE_WL, 1, [Define to 1 if you use Wayland instead of X.])
+fi
+
 ## $window_system is now set to the window system we will
 ## ultimately use.
 
@@ -1987,6 +2012,9 @@ dnl use the toolkit if we have gtk, or X11R5 or newer.
   ;;
   w32 )
     term_header=w32term.h
+  ;;
+  wl )
+    term_header=wlterm.h
   ;;
 esac
 
@@ -2977,6 +3005,9 @@ else
     HAVE_LIBOTF=no
     HAVE_M17N_FLT=no
 fi
+
+     AC_DEFINE(HAVE_FREETYPE, 1,
+	       [Define to 1 if using the freetype and fontconfig libraries.])
 
 ### End of font-backend (under X11) section.
 

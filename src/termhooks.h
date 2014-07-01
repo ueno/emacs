@@ -49,7 +49,8 @@ enum output_method
   output_x_window,
   output_msdos_raw,
   output_w32,
-  output_ns
+  output_ns,
+  output_wl
 };
 
 /* Input queue declarations and hooks.  */
@@ -387,6 +388,7 @@ struct terminal
     struct x_display_info *x;         /* xterm.h */
     struct w32_display_info *w32;     /* w32term.h */
     struct ns_display_info *ns;       /* nsterm.h */
+    struct ewl_display_info *wl;     /* wlterm.h */
   } display_info;
 
 
@@ -641,6 +643,9 @@ extern struct terminal *terminal_list;
 #elif defined (HAVE_NS)
 #define TERMINAL_FONT_CACHE(t)						\
   (t->type == output_ns ? t->display_info.ns->name_list_element : Qnil)
+#elif defined (HAVE_WL)
+#define TERMINAL_FONT_CACHE(t)						\
+  (t->type == output_wl ? t->display_info.wl->name_list_element : Qnil)
 #endif
 
 extern struct terminal *get_terminal (Lisp_Object terminal, bool);

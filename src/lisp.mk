@@ -160,6 +160,7 @@ lisp = \
 	$(lispsource)/term/pc-win.elc \
 	$(lispsource)/term/internal.elc \
 	$(lispsource)/term/ns-win.elc \
+	$(lispsource)/term/wl-win.elc \
 	$(lispsource)/mwheel.elc \
 	$(lispsource)/emacs-lisp/float-sup.elc \
 	$(lispsource)/vc/vc-hooks.elc \

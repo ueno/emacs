@@ -648,6 +648,8 @@ On graphical displays, this function does not itself make the new
 frame the selected frame.  However, the window system may select
 the new frame according to its own rules."
   (interactive)
+  (if (assq 'font parameters)
+      (error "%S" parameters))
   (let* ((display (cdr (assq 'display parameters)))
          (w (cond
 	     ((assq 'terminal parameters)
@@ -789,7 +791,7 @@ recently selected windows nor the buffer list."
   (select-frame frame norecord)
   (raise-frame frame)
   ;; Ensure, if possible, that FRAME gets input focus.
-  (when (memq (window-system frame) '(x w32 ns))
+  (when (memq (window-system frame) '(x w32 ns wl))
     (x-focus-frame frame))
   ;; Move mouse cursor if necessary.
   (cond
@@ -843,7 +845,7 @@ Calls `suspend-emacs' if invoked from the controlling tty device,
   (interactive)
   (let ((type (framep (selected-frame))))
     (cond
-     ((memq type '(x ns w32)) (iconify-or-deiconify-frame))
+     ((memq type '(x ns w32 wl)) (iconify-or-deiconify-frame))
      ((eq type t)
       (if (controlling-tty-p)
 	  (suspend-emacs)
@@ -1338,7 +1340,7 @@ frames and several different fonts at once.  This is true for displays
 that use a window system such as X, and false for text-only terminals.
 DISPLAY can be a display name, a frame, or nil (meaning the selected
 frame's display)."
-  (not (null (memq (framep-on-display display) '(x w32 ns)))))
+  (not (null (memq (framep-on-display display) '(x w32 ns wl)))))
 
 (defun display-images-p (&optional display)
   "Return non-nil if DISPLAY can display images.
@@ -1365,7 +1367,7 @@ frame's display)."
       ;; the Windows' DOS Box.
       (with-no-warnings
        (not (null dos-windows-version))))
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       t)
      (t
       nil))))
@@ -1377,7 +1379,7 @@ frame's display)."
 If DISPLAY is omitted or nil, it defaults to the selected frame's display."
   (let ((frame-type (framep-on-display display)))
     (cond
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       (x-display-screens display))
      (t
       1))))
@@ -1396,7 +1398,7 @@ with DISPLAY.  To get information for each physical monitor, use
 `display-monitor-attributes-list'."
   (let ((frame-type (framep-on-display display)))
     (cond
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       (x-display-pixel-height display))
      (t
       (frame-height (if (framep display) display (selected-frame)))))))
@@ -1415,7 +1417,7 @@ with DISPLAY.  To get information for each physical monitor, use
 `display-monitor-attributes-list'."
   (let ((frame-type (framep-on-display display)))
     (cond
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       (x-display-pixel-width display))
      (t
       (frame-width (if (framep display) display (selected-frame)))))))
@@ -1452,7 +1454,7 @@ For graphical terminals, note that on \"multi-monitor\" setups this
 refers to the height in millimeters for all physical monitors
 associated with DISPLAY.  To get information for each physical
 monitor, use `display-monitor-attributes-list'."
-  (and (memq (framep-on-display display) '(x w32 ns))
+  (and (memq (framep-on-display display) '(x w32 ns wl))
        (or (cddr (assoc (or display (frame-parameter nil 'display))
 			display-mm-dimensions-alist))
 	   (cddr (assoc t display-mm-dimensions-alist))
@@ -1472,7 +1474,7 @@ For graphical terminals, note that on \"multi-monitor\" setups this
 refers to the width in millimeters for all physical monitors
 associated with DISPLAY.  To get information for each physical
 monitor, use `display-monitor-attributes-list'."
-  (and (memq (framep-on-display display) '(x w32 ns))
+  (and (memq (framep-on-display display) '(x w32 ns wl))
        (or (cadr (assoc (or display (frame-parameter nil 'display))
 			display-mm-dimensions-alist))
 	   (cadr (assoc t display-mm-dimensions-alist))
@@ -1489,7 +1491,7 @@ the question is inapplicable to a certain kind of display.
 If DISPLAY is omitted or nil, it defaults to the selected frame's display."
   (let ((frame-type (framep-on-display display)))
     (cond
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       (x-display-backing-store display))
      (t
       'not-useful))))
@@ -1501,7 +1503,7 @@ If DISPLAY is omitted or nil, it defaults to the selected frame's display."
 If DISPLAY is omitted or nil, it defaults to the selected frame's display."
   (let ((frame-type (framep-on-display display)))
     (cond
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       (x-display-save-under display))
      (t
       'not-useful))))
@@ -1513,7 +1515,7 @@ If DISPLAY is omitted or nil, it defaults to the selected frame's display."
 If DISPLAY is omitted or nil, it defaults to the selected frame's display."
   (let ((frame-type (framep-on-display display)))
     (cond
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       (x-display-planes display))
      ((eq frame-type 'pc)
       4)
@@ -1527,7 +1529,7 @@ If DISPLAY is omitted or nil, it defaults to the selected frame's display."
 If DISPLAY is omitted or nil, it defaults to the selected frame's display."
   (let ((frame-type (framep-on-display display)))
     (cond
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       (x-display-color-cells display))
      ((eq frame-type 'pc)
       16)
@@ -1543,7 +1545,7 @@ The value is one of the symbols `static-gray', `gray-scale',
 If DISPLAY is omitted or nil, it defaults to the selected frame's display."
   (let ((frame-type (framep-on-display display)))
     (cond
-     ((memq frame-type '(x w32 ns))
+     ((memq frame-type '(x w32 ns wl))
       (x-display-visual-class display))
      ((and (memq frame-type '(pc t))
 	   (tty-display-color-p display))
@@ -1811,7 +1813,7 @@ terminals, cursor blinking is controlled by the terminal."
   :init-value (not (or noninteractive
 		       no-blinking-cursor
 		       (eq system-type 'ms-dos)
-		       (not (memq window-system '(x w32 ns)))))
+		       (not (memq window-system '(x w32 ns wl)))))
   :initialize 'custom-initialize-delay
   :group 'cursor
   :global t

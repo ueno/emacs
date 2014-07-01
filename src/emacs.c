@@ -1512,6 +1512,12 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_fontset ();
 #endif /* HAVE_NS */
 
+#ifdef HAVE_WL
+      syms_of_wlterm ();
+      syms_of_wlfns ();
+      syms_of_fontset ();
+#endif	/* HAVE_WL */
+
 #ifdef HAVE_GNUTLS
       syms_of_gnutls ();
 #endif
