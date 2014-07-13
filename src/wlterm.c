@@ -223,7 +223,6 @@ ewl_prepare_cairo_surface (struct frame *f, int width, int height)
 {
   struct ewl_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   struct wl_shm_pool *pool;
-  struct wl_buffer *buffer;
   int size, stride;
   int fd;
   void *p;
@@ -410,6 +409,21 @@ ewl_update_window_begin (struct window *w)
 }
 
 
+static cairo_t *
+ewl_cairo_create (struct frame *f)
+{
+  cairo_t *cr;
+  double ux = 1, uy = 1;
+
+  cr = cairo_create (f->output_data.wl->cairo_surface);
+  cairo_device_to_user_distance (cr, &ux, &uy);
+  if (ux < uy)
+    ux = uy;
+  cairo_set_line_width (cr, ux);
+
+  return cr;
+}
+
 /* Draw a vertical window border from (x,y0) to (x,y1)  */
 
 static void
@@ -420,7 +434,7 @@ ewl_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
   cairo_t *cr;
   struct ewl_color fg;
 
-  cr = cairo_create (f->output_data.wl->cairo_surface);
+  cr = ewl_cairo_create (f);
   face = FACE_FROM_ID (f, VERTICAL_BORDER_FACE_ID);
   if (face)
     {
@@ -452,7 +466,7 @@ ewl_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
   cairo_t *cr;
   struct ewl_color fg;
 
-  cr = cairo_create (f->output_data.wl->cairo_surface);
+  cr = ewl_cairo_create (f);
   if (y1 - y0 > x1 - x0 && x1 - x0 > 2)
     /* Vertical.  */
     {
@@ -591,7 +605,7 @@ ewl_scroll_run (struct window *w, struct run *run)
   /* Cursor off.  Will be switched on again in x_update_window_end.  */
   x_clear_cursor (w);
 
-  cr = cairo_create (f->output_data.wl->cairo_surface);
+  cr = ewl_cairo_create (f);
   cairo_set_source_surface (cr, f->output_data.wl->cairo_surface,
 			    0, to_y - from_y);
   cairo_rectangle (cr, x, to_y, width, height);
@@ -647,7 +661,7 @@ ewl_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fri
   struct face *face = p->face;
   cairo_t *cr;
 
-  cr = cairo_create (f->output_data.wl->cairo_surface);
+  cr = ewl_cairo_create (f);
 
   /* Must clip because of partially visible lines.  */
   ewl_clip_to_row (w, row, ANY_AREA, cr);
@@ -678,7 +692,7 @@ ewl_clear_frame_area (struct frame *f, int x, int y, int width, int height)
   cairo_t *cr;
 
   ewl_query_color (FRAME_BACKGROUND_PIXEL (f), &bg);
-  cr = cairo_create (f->output_data.wl->cairo_surface);
+  cr = ewl_cairo_create (f);
   cairo_set_source_rgba (cr, bg.red, bg.green, bg.blue, bg.alpha);
   cairo_rectangle (cr, x, y, width, height);
   cairo_fill (cr);
@@ -697,7 +711,7 @@ ewl_draw_hollow_cursor (struct window *w, struct glyph_row *row)
   XGCValues xgcv;
   struct glyph *cursor_glyph;
   GC gc;
-  cairo_t *cr = cairo_create (f->output_data.wl->cairo_surface);
+  cairo_t *cr = ewl_cairo_create (f);
   struct ewl_color fg;
 
   /* Get the glyph the cursor is on.  If we can't tell because
@@ -1754,7 +1768,7 @@ static void
 ewl_draw_glyph_string (struct glyph_string *s)
 {
   bool relief_drawn_p = 0;
-  cairo_t *cr = cairo_create (s->f->output_data.wl->cairo_surface);
+  cairo_t *cr = ewl_cairo_create (s->f);
 
   /* If S draws into the background of its successors, draw the
      background of the successors first so that S can draw into it.
@@ -1928,7 +1942,7 @@ ewl_shift_glyphs_for_insert (struct frame *f, int x, int y, int width, int heigh
 {
   cairo_t *cr;
 
-  cr = cairo_create (f->output_data.wl->cairo_surface);
+  cr = ewl_cairo_create (f);
   cairo_set_source_surface (cr, f->output_data.wl->cairo_surface,
 			    shift_by, 0);
   cairo_rectangle (cr, x + shift_by, y, width, height);
@@ -2016,7 +2030,7 @@ ewl_clear_frame (struct frame *f)
   cairo_t *cr;
   struct ewl_color bg;
 
-  cr = cairo_create (f->output_data.wl->cairo_surface);
+  cr = ewl_cairo_create (f);
   ewl_query_color (FRAME_BACKGROUND_PIXEL (f), &bg);
   cairo_set_source_rgba (cr, bg.red, bg.green, bg.blue, bg.alpha);
   cairo_paint (cr);
