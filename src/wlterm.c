@@ -218,8 +218,8 @@ ewl_create_anonymous_file (off_t size)
 }
 
 
-static struct wl_buffer *
-ewl_create_shm_buffer (struct frame *f, int width, int height)
+static void
+ewl_prepare_cairo_surface (struct frame *f, int width, int height)
 {
   struct ewl_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   struct wl_shm_pool *pool;
@@ -233,26 +233,36 @@ ewl_create_shm_buffer (struct frame *f, int width, int height)
 
   fd = ewl_create_anonymous_file (size);
   if (fd < 0)
-    return NULL;
+    return;
 
   p = mmap (NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (p == MAP_FAILED)
     {
       close(fd);
-      return NULL;
+      return;
     }
 
-  pool = wl_shm_create_pool (dpyinfo->shm, fd, size);
-  buffer = wl_shm_pool_create_buffer (pool, 0,
-				      width, height, stride,
-				      WL_SHM_FORMAT_ARGB8888);
-  wl_shm_pool_destroy (pool);
-
+  if (f->output_data.wl->data)
+    munmap (f->output_data.wl->data, f->output_data.wl->size);
   f->output_data.wl->size = size;
   f->output_data.wl->data = p;
 
+  pool = wl_shm_create_pool (dpyinfo->shm, fd, size);
+  if (f->output_data.wl->buffer)
+    wl_buffer_destroy (f->output_data.wl->buffer);
+  f->output_data.wl->buffer
+    = wl_shm_pool_create_buffer (pool, 0,
+				 width, height, stride,
+				 WL_SHM_FORMAT_ARGB8888);
+  wl_shm_pool_destroy (pool);
+
+  if (f->output_data.wl->cairo_surface)
+    cairo_surface_destroy (f->output_data.wl->cairo_surface);
+  f->output_data.wl->cairo_surface
+    = cairo_image_surface_create_for_data (p,
+					   CAIRO_FORMAT_ARGB32,
+					   width, height, stride);
   close (fd);
-  return buffer;
 }
 
 
@@ -268,26 +278,8 @@ static void
 ewl_redraw_frame (void *data, struct wl_callback *callback, uint32_t time)
 {
   struct frame *f = data;
-  cairo_surface_t *cairo_surface;
-  cairo_t *cr;
-  int width, height, stride;
 
   block_input ();
-
-  width = cairo_image_surface_get_width (f->output_data.wl->cairo_surface);
-  height = cairo_image_surface_get_height (f->output_data.wl->cairo_surface);
-  stride = cairo_image_surface_get_stride (f->output_data.wl->cairo_surface);
-  cairo_surface
-    = cairo_image_surface_create_for_data (f->output_data.wl->data,
-					   CAIRO_FORMAT_ARGB32,
-					   width,
-					   height,
-					   stride);
-  cr = cairo_create (cairo_surface);
-  cairo_set_source_surface (cr, f->output_data.wl->cairo_surface, 0, 0);
-  cairo_paint (cr);
-  cairo_destroy (cr);
-  cairo_surface_destroy (cairo_surface);
 
   wl_surface_attach (f->output_data.wl->surface, f->output_data.wl->buffer,
 		     0, 0);
@@ -321,16 +313,7 @@ ewl_frame_set_char_size (struct frame *f, int width, int height)
   if (f->output_data.wl->surface == NULL)
     return;
 
-  if (f->output_data.wl->cairo_surface)
-    cairo_surface_destroy (f->output_data.wl->cairo_surface);
-  f->output_data.wl->cairo_surface
-    = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
-				  pixelwidth, pixelheight);
-
-  if (f->output_data.wl->buffer)
-    wl_buffer_destroy (f->output_data.wl->buffer);
-  f->output_data.wl->buffer
-    = ewl_create_shm_buffer (f, pixelwidth, pixelheight);
+  ewl_prepare_cairo_surface (f, pixelwidth, pixelheight);
 
   if (f->output_data.wl->callback)
     wl_callback_destroy (f->output_data.wl->callback);
