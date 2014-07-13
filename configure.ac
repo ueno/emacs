@@ -3006,9 +3006,6 @@ else
     HAVE_M17N_FLT=no
 fi
 
-     AC_DEFINE(HAVE_FREETYPE, 1,
-	       [Define to 1 if using the freetype and fontconfig libraries.])
-
 ### End of font-backend (under X11) section.
 
 AC_SUBST(FREETYPE_CFLAGS)
