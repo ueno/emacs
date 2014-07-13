@@ -648,8 +648,6 @@ On graphical displays, this function does not itself make the new
 frame the selected frame.  However, the window system may select
 the new frame according to its own rules."
   (interactive)
-  (if (assq 'font parameters)
-      (error "%S" parameters))
   (let* ((display (cdr (assq 'display parameters)))
          (w (cond
 	     ((assq 'terminal parameters)
