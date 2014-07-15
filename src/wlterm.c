@@ -2190,6 +2190,8 @@ ewl_keyboard_handle_keymap (void *data, struct wl_keyboard *wl_keyboard,
     1 << xkb_map_mod_get_index (dpyinfo->xkb_keymap, "Control");
   dpyinfo->alt_mod_mask =
     1 << xkb_map_mod_get_index (dpyinfo->xkb_keymap, "Mod1");
+  dpyinfo->meta_mod_mask =
+    1 << xkb_map_mod_get_index (dpyinfo->xkb_keymap, "Meta");
   dpyinfo->shift_mod_mask =
     1 << xkb_map_mod_get_index (dpyinfo->xkb_keymap, "Shift");
   dpyinfo->shift_lock_mask =
@@ -2198,6 +2200,20 @@ ewl_keyboard_handle_keymap (void *data, struct wl_keyboard *wl_keyboard,
     1 << xkb_map_mod_get_index (dpyinfo->xkb_keymap, "Super");
   dpyinfo->hyper_mod_mask =
     1 << xkb_map_mod_get_index (dpyinfo->xkb_keymap, "Hyper");
+
+  /* If we couldn't find any meta keys, accept any alt keys as meta keys.  */
+  if (! dpyinfo->meta_mod_mask)
+    {
+      dpyinfo->meta_mod_mask = dpyinfo->alt_mod_mask;
+      dpyinfo->alt_mod_mask = 0;
+    }
+
+  /* If some keys are both alt and meta,
+     make them just meta, not alt.  */
+  if (dpyinfo->alt_mod_mask & dpyinfo->meta_mod_mask)
+    {
+      dpyinfo->alt_mod_mask &= ~dpyinfo->meta_mod_mask;
+    }
 }
 
 
