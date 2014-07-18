@@ -670,12 +670,26 @@ ewl_shell_surface_handle_ping (void *data,
   wl_shell_surface_pong (shell_surface, serial);
 }
 
+static void
+ewl_shell_surface_handle_configure (void *data,
+				    struct wl_shell_surface *wl_shell_surface,
+				    uint32_t edges,
+				    int32_t width,
+				    int32_t height)
+{
+}
+
+static void
+ewl_shell_surface_popup_done (void *data,
+			      struct wl_shell_surface *wl_shell_surface)
+{
+}
 
 static const struct wl_shell_surface_listener ewl_shell_surface_listener =
   {
     ewl_shell_surface_handle_ping,
-    NULL,
-    NULL
+    ewl_shell_surface_handle_configure,
+    ewl_shell_surface_popup_done
   };
 
 
