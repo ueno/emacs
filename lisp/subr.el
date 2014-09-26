@@ -1906,6 +1906,64 @@ process."
        (memq (process-status process)
 	     '(run open listen connect stop))))
 
+(defun start-process (name buffer program &rest program-args)
+  "Start a program in a subprocess.  Return the process object for it.
+NAME is name for process.  It is modified if necessary to make it unique.
+BUFFER is the buffer (or buffer name) to associate with the process.
+
+Process output (both standard output and standard error streams) goes
+at end of BUFFER, unless you specify an output stream or filter
+function to handle the output.  BUFFER may also be nil, meaning that
+this process is not associated with any buffer.
+
+PROGRAM is the program file name.  It is searched for in `exec-path'
+\(which see).  If nil, just associate a pty with the buffer.  Remaining
+arguments are strings to give program as arguments.
+
+If you want to separate standard output from standard error, invoke
+the command through a shell and redirect one of them using the shell
+syntax."
+  (let ((decode-cs coding-system-for-read)
+	(encode-cs coding-system-for-write)
+	(coding-systems t) ;t denotes we have not yet called
+			   ;find-operation-coding-system
+	(contact (list :name name
+		       :buffer buffer
+		       :program program
+		       :args program-args
+		       :pty process-connection-type)))
+    ;; Decide coding systems for communicating with the process.
+    (unless decode-cs
+      (if program
+	  (setq coding-systems (apply #'find-operation-coding-system
+				      'start-process
+				      name
+				      buffer
+				      program
+				      program-args)))
+      (if (consp coding-systems)
+	  (setq decode-cs (car coding-systems))
+	(if (consp default-process-coding-system)
+	    (setq decode-cs (car default-process-coding-system)))))
+    (unless encode-cs
+      (if (and (eq coding-systems t) program)
+	  (setq coding-systems (apply #'find-operation-coding-system
+				      'start-process
+				      name
+				      buffer
+				      program
+				      program-args)))
+      (if (consp coding-systems)
+	  (setq encode-cs (cdr coding-systems))
+	(if (consp default-process-coding-system)
+	    (setq encode-cs (cdr default-process-coding-system)))))
+    (if decode-cs
+	(if encode-cs
+	    (setq contact (plist-put contact
+				     :coding (cons decode-cs encode-cs)))
+	  (setq contact (plist-put contact :coding decode-cs))))
+    (apply #'make-subprocess contact)))
+
 ;; compatibility
 
 (make-obsolete

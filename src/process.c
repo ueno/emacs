@@ -205,6 +205,7 @@ static Lisp_Object QCbuffer, QChost, QCservice;
 static Lisp_Object QClocal, QCremote, QCcoding;
 static Lisp_Object QCserver, QCnowait, QCnoquery, QCstop;
 static Lisp_Object QCsentinel, QClog, QCoptions, QCplist;
+static Lisp_Object QCprogram, QCargs;
 static Lisp_Object Qlast_nonmenu_event;
 static Lisp_Object Qinternal_default_process_sentinel;
 static Lisp_Object Qinternal_default_process_filter;
@@ -1361,36 +1362,65 @@ DEFUN ("process-list", Fprocess_list, Sprocess_list, 0, 0, 0,
 
 /* Starting asynchronous inferior processes.  */
 
-static void start_process_unwind (Lisp_Object proc);
+static void make_subprocess_unwind (Lisp_Object proc);
 
-DEFUN ("start-process", Fstart_process, Sstart_process, 3, MANY, 0,
-       doc: /* Start a program in a subprocess.  Return the process object for it.
-NAME is name for process.  It is modified if necessary to make it unique.
-BUFFER is the buffer (or buffer name) to associate with the process.
+DEFUN ("make-subprocess", Fmake_subprocess, Smake_subprocess, 0, MANY, 0,
+       doc: /* Create and return a subprocess.
 
-Process output (both standard output and standard error streams) goes
-at end of BUFFER, unless you specify an output stream or filter
-function to handle the output.  BUFFER may also be nil, meaning that
-this process is not associated with any buffer.
+Arguments are specified as keyword/argument pairs.  The following
+arguments are defined:
 
-PROGRAM is the program file name.  It is searched for in `exec-path'
-(which see).  If nil, just associate a pty with the buffer.  Remaining
-arguments are strings to give program as arguments.
+:name NAME -- NAME is name for process.  It is modified if necessary
+to make it unique.
 
-If you want to separate standard output from standard error, invoke
-the command through a shell and redirect one of them using the shell
-syntax.
+:buffer BUFFER -- BUFFER is the buffer (or buffer-name) to associate
+with the process.  Process output goes at end of that buffer, unless
+you specify an output stream or filter function to handle the output.
+BUFFER may be also nil, meaning that this process is not associated
+with any buffer.
 
-usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
+:program PROGRAM -- PROGRAM is the program file name.
+
+:args ARGS -- ARGS is a list of strings to give program as arguments.
+
+:pty BOOL -- If BOOL is non-nil, use a pty to communicate with subprocess.
+Otherwise a pipe is used.
+
+:coding CODING -- If CODING is a symbol, it specifies the coding
+system used for both reading and writing for this process.  If CODING
+is a cons (DECODING . ENCODING), DECODING is used for reading, and
+ENCODING is used for writing.
+
+:filter FILTER -- Install FILTER as the process filter.
+
+:filter-multibyte BOOL -- If BOOL is non-nil, strings given to the
+process filter are multibyte, otherwise they are unibyte.
+If this keyword is not specified, the strings are multibyte if
+the default value of `enable-multibyte-characters' is non-nil.
+
+:sentinel SENTINEL -- Install SENTINEL as the process sentinel.
+
+usage: (make-subprocess &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object buffer, name, program, proc, current_dir, tem;
+  Lisp_Object buffer, name, program, program_args, coding;
+  Lisp_Object proc, current_dir, tem;
+  Lisp_Object contact;
+  ptrdiff_t new_argc;
   unsigned char **new_argv;
   ptrdiff_t i;
   ptrdiff_t count = SPECPDL_INDEX ();
+  struct gcpro gcpro1;
   USE_SAFE_ALLOCA;
 
-  buffer = args[1];
+  if (nargs == 0)
+    return Qnil;
+
+  /* Save arguments for process-contact and clone-process.  */
+  contact = Flist (nargs, args);
+  GCPRO1 (contact);
+
+  buffer = Fplist_get (contact, QCbuffer);
   if (!NILP (buffer))
     buffer = Fget_buffer_create (buffer);
 
@@ -1410,28 +1440,30 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
     UNGCPRO;
   }
 
-  name = args[0];
+  name = Fplist_get (contact, QCname);
   CHECK_STRING (name);
 
-  program = args[2];
+  program = Fplist_get (contact, QCprogram);
 
   if (!NILP (program))
     CHECK_STRING (program);
+
+  program_args = Fplist_get (contact, QCargs);
 
   proc = make_process (name);
   /* If an error occurs and we can't start the process, we want to
      remove it from the process list.  This means that each error
      check in create_process doesn't need to call remove_process
      itself; it's all taken care of here.  */
-  record_unwind_protect (start_process_unwind, proc);
+  record_unwind_protect (make_subprocess_unwind, proc);
 
   pset_childp (XPROCESS (proc), Qt);
   pset_plist (XPROCESS (proc), Qnil);
   pset_type (XPROCESS (proc), Qreal);
   pset_buffer (XPROCESS (proc), buffer);
-  pset_sentinel (XPROCESS (proc), Qinternal_default_process_sentinel);
-  pset_filter (XPROCESS (proc), Qinternal_default_process_filter);
-  pset_command (XPROCESS (proc), Flist (nargs - 2, args + 2));
+  pset_sentinel (XPROCESS (proc), Fplist_get (contact, QCsentinel));
+  pset_filter (XPROCESS (proc), Fplist_get (contact, QCfilter));
+  pset_command (XPROCESS (proc), Fcons (program, program_args));
 
 #ifdef HAVE_GNUTLS
   /* AKA GNUTLS_INITSTAGE(proc).  */
@@ -1452,50 +1484,38 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
 		     BUF_ZV_BYTE (XBUFFER (buffer)));
 
   {
-    /* Decide coding systems for communicating with the process.  Here
-       we don't setup the structure coding_system nor pay attention to
-       unibyte mode.  They are done in create_process.  */
+    Lisp_Object val;
 
-    /* Qt denotes we have not yet called Ffind_operation_coding_system.  */
-    Lisp_Object coding_systems = Qt;
-    Lisp_Object val, *args2;
-    struct gcpro gcpro1, gcpro2;
+    tem = Fplist_member (contact, QCcoding);
+    if (!NILP (tem) && (!CONSP (tem) || !CONSP (XCDR (tem))))
+      tem = Qnil;
 
-    val = Vcoding_system_for_read;
-    if (NILP (val))
+    val = Qnil;
+    if (!NILP (tem))
       {
-	SAFE_ALLOCA_LISP (args2, nargs + 1);
-	args2[0] = Qstart_process;
-	for (i = 0; i < nargs; i++) args2[i + 1] = args[i];
-	GCPRO2 (proc, current_dir);
-	if (!NILP (program))
-	  coding_systems = Ffind_operation_coding_system (nargs + 1, args2);
-	UNGCPRO;
-	if (CONSP (coding_systems))
-	  val = XCAR (coding_systems);
-	else if (CONSP (Vdefault_process_coding_system))
-	  val = XCAR (Vdefault_process_coding_system);
+	val = XCAR (XCDR (tem));
+	if (CONSP (val))
+	  val = XCAR (val);
       }
+    else if (!NILP (Vcoding_system_for_read))
+      val = Vcoding_system_for_read;
+    else if ((!NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
+	     || (NILP (buffer) && NILP (BVAR (&buffer_defaults, enable_multibyte_characters))))
+      val = Qnil;
     pset_decode_coding_system (XPROCESS (proc), val);
 
-    val = Vcoding_system_for_write;
-    if (NILP (val))
+    val = Qnil;
+    if (!NILP (tem))
       {
-	if (EQ (coding_systems, Qt))
-	  {
-	    SAFE_ALLOCA_LISP (args2, nargs + 1);
-	    args2[0] = Qstart_process;
-	    for (i = 0; i < nargs; i++) args2[i + 1] = args[i];
-	    GCPRO2 (proc, current_dir);
-	    if (!NILP (program))
-	      coding_systems = Ffind_operation_coding_system (nargs + 1, args2);
-	    UNGCPRO;
-	  }
-	if (CONSP (coding_systems))
-	  val = XCDR (coding_systems);
-	else if (CONSP (Vdefault_process_coding_system))
-	  val = XCDR (Vdefault_process_coding_system);
+	val = XCAR (XCDR (tem));
+	if (CONSP (val))
+	  val = XCDR (val);
       }
+    else if (!NILP (Vcoding_system_for_write))
+      val = Vcoding_system_for_write;
+    else if ((!NILP (buffer) && NILP (BVAR (XBUFFER (buffer), enable_multibyte_characters)))
+	     || (NILP (buffer) && NILP (BVAR (&buffer_defaults, enable_multibyte_characters))))
+      val = Qnil;
     pset_encode_coding_system (XPROCESS (proc), val);
     /* Note: At this moment, the above coding system may leave
        text-conversion or eol-conversion unspecified.  They will be
@@ -1503,7 +1523,6 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
        some coding system, or just before we actually send a text to
        the process.  */
   }
-
 
   pset_decoding_buf (XPROCESS (proc), empty_unibyte_string);
   XPROCESS (proc)->decoding_carryover = 0;
@@ -1520,10 +1539,10 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
 	  && !(SCHARS (program) > 1
 	       && IS_DEVICE_SEP (SREF (program, 1))))
 	{
-	  struct gcpro gcpro1, gcpro2, gcpro3, gcpro4;
+	  struct gcpro gcpro1, gcpro2;
 
 	  tem = Qnil;
-	  GCPRO4 (name, program, buffer, current_dir);
+	  GCPRO2 (buffer, current_dir);
 	  openp (Vexec_path, program, Vexec_suffixes, &tem,
 		 make_number (X_OK), false);
 	  UNGCPRO;
@@ -1546,7 +1565,9 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
 
       {
 	Lisp_Object arg_encoding = Qnil;
+	Lisp_Object tail;
 	struct gcpro gcpro1;
+
 	GCPRO1 (tem);
 
 	/* Encode the file name and put it in NEW_ARGV.
@@ -1558,9 +1579,10 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
 	   systems for encoding arguments and for encoding data sent to the
 	   process.  */
 
-	for (i = 3; i < nargs; i++)
+	new_argc = 1;
+	for (tail = program_args; CONSP (tail); tail = XCDR (tail))
 	  {
-	    tem = Fcons (args[i], tem);
+	    tem = Fcons (XCAR (tail), tem);
 	    CHECK_STRING (XCAR (tem));
 	    if (STRING_MULTIBYTE (XCAR (tem)))
 	      {
@@ -1571,6 +1593,7 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
 			 code_convert_string_norecord
 			 (XCAR (tem), arg_encoding, 1));
 	      }
+	    new_argc++;
 	  }
 
 	UNGCPRO;
@@ -1578,10 +1601,10 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
 
       /* Now that everything is encoded we can collect the strings into
 	 NEW_ARGV.  */
-      SAFE_NALLOCA (new_argv, 1, nargs - 1);
-      new_argv[nargs - 2] = 0;
+      SAFE_NALLOCA (new_argv, 1, new_argc + 1);
+      new_argv[new_argc] = 0;
 
-      for (i = nargs - 2; i-- != 0; )
+      for (i = new_argc - 1; i >= 0; i--)
 	{
 	  new_argv[i] = SDATA (XCAR (tem));
 	  tem = XCDR (tem);
@@ -1596,12 +1619,12 @@ usage: (start-process NAME BUFFER PROGRAM &rest PROGRAM-ARGS)  */)
   return unbind_to (count, proc);
 }
 
-/* This function is the unwind_protect form for Fstart_process.  If
+/* This function is the unwind_protect form for Fmake_subprocess.  If
    PROC doesn't have its pid set, then we know someone has signaled
    an error and the process wasn't started successfully, so we should
    remove it from the process list.  */
 static void
-start_process_unwind (Lisp_Object proc)
+make_subprocess_unwind (Lisp_Object proc)
 {
   if (!PROCESSP (proc))
     emacs_abort ();
@@ -7265,6 +7288,8 @@ syms_of_process (void)
   DEFSYM (QCstop, ":stop");
   DEFSYM (QCoptions, ":options");
   DEFSYM (QCplist, ":plist");
+  DEFSYM (QCprogram, ":program");
+  DEFSYM (QCargs, ":args");
 
   DEFSYM (Qlast_nonmenu_event, "last-nonmenu-event");
 
@@ -7367,7 +7392,7 @@ The variable takes effect when `start-process' is called.  */);
   defsubr (&Sprocess_plist);
   defsubr (&Sset_process_plist);
   defsubr (&Sprocess_list);
-  defsubr (&Sstart_process);
+  defsubr (&Smake_subprocess);
   defsubr (&Sserial_process_configure);
   defsubr (&Smake_serial_process);
   defsubr (&Sset_network_process_option);
